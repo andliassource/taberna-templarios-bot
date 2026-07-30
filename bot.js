@@ -180,10 +180,12 @@ async function apiCall(method, body = {}) {
 }
 
 // ----------------------------------------------------
-// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL (v8.0)
+// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL COM LINK DO GITHUB
 // ----------------------------------------------------
-const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v8.0)\n\n` +
+const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v8.1)\n\n` +
   `📌 <b>Esta mensagem fica sempre fixada e atualizada com as novas funções!</b>\n\n` +
+  `🌐 <b>Repositório Oficial no GitHub:</b>\n` +
+  `🔗 <a href="https://github.com/andliassource/taberna-templarios-bot">https://github.com/andliassource/taberna-templarios-bot</a>\n\n` +
   `🤖 <b>INTELIGÊNCIA ARTIFICIAL & MODO TAVERNEIRO</b>\n` +
   `• <code>/ia [pergunta]</code> ou <code>/pergunta</code> - Pergunta ao Taverneiro Inteligente\n` +
   `• <b>Modo Taverneiro Falante:</b> Cite "taverneiro" ou responda ao bot no chat que ele entra na conversa sozinho!\n\n` +
@@ -211,7 +213,7 @@ const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b
   `• <code>/dolar</code> ou <code>/btc</code> - Cotações em tempo real do Dólar, Euro e Bitcoin\n\n` +
   `🏆 <b>RANKING DE ENGAJAMENTO (XP)</b>\n` +
   `• <code>/top</code> ou <code>/ranking</code> - Placar dos membros mais ativos da Taverna\n\n` +
-  `🛡️ <i>Sempre que novos comandos forem lançados, esta mensagem será atualizada automaticamente!</i>`;
+  `💻 <i>Código-fonte público e aberto para os Templários no GitHub!</i>`;
 
 async function syncPinnedManual() {
   if (dbData.pinnedManualMsgId) {
@@ -220,18 +222,17 @@ async function syncPinnedManual() {
         chat_id: CHAT_ID,
         message_id: dbData.pinnedManualMsgId,
         text: OFFICIAL_MANUAL_TEXT,
-        parse_mode: "HTML"
+        parse_mode: "HTML",
+        disable_web_page_preview: false
       });
-      console.log("📌 Mensagem fixada do manual sincronizada na v8.0 com sucesso!");
+      console.log("📌 Mensagem fixada do manual sincronizada com o link do GitHub!");
     } catch (e) {
       console.error("Erro ao sincronizar mensagem fixada do manual:", e.message);
     }
   }
 }
 
-// ----------------------------------------------------
-// 1. PERFIL GAMER E CADASTRO STEAM (/perfil e /setsteam)
-// ----------------------------------------------------
+// PERFIL GAMER E CADASTRO STEAM (/perfil e /setsteam)
 async function handleSetSteam(msg, argsText) {
   const userId = msg.from ? msg.from.id : null;
   const steamNick = argsText.trim();
@@ -283,9 +284,7 @@ async function handlePerfil(msg) {
   });
 }
 
-// ----------------------------------------------------
-// 2. PLACAR E JOGOS DE FUTEBOL DO DIA (/futebol ou /jogos)
-// ----------------------------------------------------
+// PLACAR E JOGOS DE FUTEBOL DO DIA (/futebol ou /jogos)
 async function handleFutebol(msg) {
   try {
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=-15.78&longitude=-47.92&current_weather=true`);
@@ -315,9 +314,7 @@ async function handleFutebol(msg) {
   }
 }
 
-// ----------------------------------------------------
-// 3. ROLETA E SORTEIO DE FILMES POR GÊNERO (/sortearfilme)
-// ----------------------------------------------------
+// ROLETA E SORTEIO DE FILMES POR GÊNERO (/sortearfilme)
 async function handleSortearFilme(msg, genreQuery) {
   const genre = genreQuery.trim() || "terror";
   try {
@@ -376,9 +373,7 @@ async function handleSortearFilme(msg, genreQuery) {
   }
 }
 
-// ----------------------------------------------------
-// 4. MODO TAVERNEIRO FALANTE AUTOMÁTICO (IA DE CONVERSA)
-// ----------------------------------------------------
+// MODO TAVERNEIRO FALANTE AUTOMÁTICO (IA DE CONVERSA)
 async function handleAutoTaverneiro(msg) {
   const rawText = (msg.text || msg.caption || "").toLowerCase();
   const isMentioned = rawText.includes("taverneiro") || rawText.includes("bot") || rawText.includes("barril") || rawText.includes("garçom");
@@ -1093,8 +1088,9 @@ async function handleFrase(msg) {
 
 // AJUDA COMPLETA
 async function handleAjuda(msg) {
-  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v8.0)</b> 🍺\n\n` +
-    `📌 <i>Consulte o tópico de <b>📜 Manual & Comandos</b> para a lista completa fixada!</i>\n\n` +
+  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v8.1)</b> 🍺\n\n` +
+    `📌 <i>Consulte o tópico <b>📜 Manual & Comandos</b> para a lista completa com link do GitHub!</i>\n\n` +
+    `🌐 <b>GitHub:</b> <a href="https://github.com/andliassource/taberna-templarios-bot">Repositório do Bot</a>\n\n` +
     `🎮 <b>/perfil</b> - Ver seu Card Gamer Templário\n` +
     `🎮 <b>/setsteam [nick]</b> - Vincular sua conta Steam\n` +
     `⚽ <b>/futebol</b> - Placar e jogos de hoje\n` +
@@ -1206,7 +1202,6 @@ async function pollUpdates() {
               await handleAjuda(msg);
             }
           } else {
-            // Modo Taverneiro Falante em conversas convencionais
             await handleAutoTaverneiro(msg);
           }
         }
@@ -1218,6 +1213,6 @@ async function pollUpdates() {
   }
 }
 
-console.log("🛡️ Bot da Taberna dos Templários v8.0 (Com Perfis Gamer + Futebol + Sorteio Filmes + IA Automática + Render Ready) iniciado!");
+console.log("🛡️ Bot da Taberna dos Templários v8.1 (Com Link do GitHub no Manual Fixado) iniciado!");
 console.log("Aguardando novas mensagens e comandos no Telegram...");
 pollUpdates();
