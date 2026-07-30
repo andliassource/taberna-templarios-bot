@@ -1,5 +1,6 @@
 node_modules/
 config.json
+games_data.json
 .env
 *.log
 scratch/
