@@ -19,22 +19,27 @@ if (fs.existsSync(configPath)) {
 const BOT_URL = `https://api.telegram.org/bot${TOKEN}`;
 const GAMES_DB_FILE = path.join(__dirname, 'games_data.json');
 
-// Carrega o banco de dados de sessões de jogatina do disco
-let gameSessions = {};
+// Carrega o banco de dados de jogatina e XP de membros do disco
+let dbData = { gameSessions: {}, userXP: {}, lastFreeGameId: null };
 
-function loadGameSessions() {
+function loadDB() {
   if (fs.existsSync(GAMES_DB_FILE)) {
     try {
       const raw = fs.readFileSync(GAMES_DB_FILE, 'utf8');
       const parsed = JSON.parse(raw);
-      for (const id in parsed) {
-        gameSessions[id] = {
-          game: parsed[id].game,
-          organizer: parsed[id].organizer,
-          going: new Set(parsed[id].going || []),
-          maybe: new Set(parsed[id].maybe || []),
-          cant: new Set(parsed[id].cant || [])
-        };
+      dbData.userXP = parsed.userXP || {};
+      dbData.lastFreeGameId = parsed.lastFreeGameId || null;
+      dbData.gameSessions = {};
+      if (parsed.gameSessions) {
+        for (const id in parsed.gameSessions) {
+          dbData.gameSessions[id] = {
+            game: parsed.gameSessions[id].game,
+            organizer: parsed.gameSessions[id].organizer,
+            going: new Set(parsed.gameSessions[id].going || []),
+            maybe: new Set(parsed.gameSessions[id].maybe || []),
+            cant: new Set(parsed.gameSessions[id].cant || [])
+          };
+        }
       }
     } catch (e) {
       console.error("Erro ao carregar games_data.json:", e.message);
@@ -42,16 +47,20 @@ function loadGameSessions() {
   }
 }
 
-function saveGameSessions() {
+function saveDB() {
   try {
-    const toSave = {};
-    for (const id in gameSessions) {
-      toSave[id] = {
-        game: gameSessions[id].game,
-        organizer: gameSessions[id].organizer,
-        going: Array.from(gameSessions[id].going),
-        maybe: Array.from(gameSessions[id].maybe),
-        cant: Array.from(gameSessions[id].cant)
+    const toSave = {
+      userXP: dbData.userXP,
+      lastFreeGameId: dbData.lastFreeGameId,
+      gameSessions: {}
+    };
+    for (const id in dbData.gameSessions) {
+      toSave.gameSessions[id] = {
+        game: dbData.gameSessions[id].game,
+        organizer: dbData.gameSessions[id].organizer,
+        going: Array.from(dbData.gameSessions[id].going),
+        maybe: Array.from(dbData.gameSessions[id].maybe),
+        cant: Array.from(dbData.gameSessions[id].cant)
       };
     }
     fs.writeFileSync(GAMES_DB_FILE, JSON.stringify(toSave, null, 2), 'utf8');
@@ -60,8 +69,9 @@ function saveGameSessions() {
   }
 }
 
-loadGameSessions();
+loadDB();
 
+// Função de Sanitização HTML
 function escapeHTML(str) {
   if (!str) return "";
   return String(str)
@@ -69,6 +79,17 @@ function escapeHTML(str) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+// Acumulador de XP de Mensagens dos Membros
+function registerUserActivity(userId, userName) {
+  if (!userId || !userName) return;
+  if (!dbData.userXP[userId]) {
+    dbData.userXP[userId] = { name: userName, count: 0 };
+  }
+  dbData.userXP[userId].name = userName;
+  dbData.userXP[userId].count += 1;
+  saveDB();
 }
 
 function parseTextToSession(text, gameName = "Jogatina", organizer = "Templário") {
@@ -145,6 +166,211 @@ async function apiCall(method, body = {}) {
   }
 }
 
+// ----------------------------------------------------
+// 1. IA DO TAVERNEIRO (/ia [pergunta])
+// ----------------------------------------------------
+async function handleIA(msg, prompt) {
+  const userQuery = prompt.trim();
+  if (!userQuery) {
+    return await apiCall("sendMessage", {
+      chat_id: msg.chat.id,
+      text: "🍺 <b>Pergunte algo ao Taverneiro!</b>\nExemplo: <code>/ia qual o melhor jogo de RPG?</code>",
+      message_thread_id: msg.message_thread_id,
+      parse_mode: "HTML"
+    });
+  }
+
+  const user = msg.from ? msg.from.first_name : "Templário";
+
+  try {
+    const aiRes = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(userQuery)}&format=json&no_html=1&skip_disambig=1`);
+    const aiData = await aiRes.json();
+
+    let answer = aiData.AbstractText || aiData.Definition || null;
+
+    if (!answer && aiData.RelatedTopics && aiData.RelatedTopics.length > 0) {
+      answer = aiData.RelatedTopics[0].Text;
+    }
+
+    if (!answer) {
+      answer = `Pelas barbas dos Templários, nobre ${user}! Essa é uma excelente questão sobre "${userQuery}". Como taverneiro, digo-lhe que o segredo é manter a cerveja gelada e a espada afiada!`;
+    }
+
+    const responseText = `🍺 <b>O TAVERNEIRO RESPONDE PARA ${user.toUpperCase()}:</b>\n\n` +
+      `📜 <i>"${escapeHTML(answer)}"\n\n— Palavras do Taverneiro da Taverna dos Templários 🛡️</i>`;
+
+    await apiCall("sendMessage", {
+      chat_id: msg.chat.id,
+      text: responseText,
+      message_thread_id: msg.message_thread_id,
+      parse_mode: "HTML"
+    });
+  } catch (err) {
+    await apiCall("sendMessage", {
+      chat_id: msg.chat.id,
+      text: `🍺 *Taverneiro:* "Ops, deu um nó no meu barril: ${err.message}"`,
+      message_thread_id: msg.message_thread_id
+    });
+  }
+}
+
+// ----------------------------------------------------
+// 2. CLIMA 100% OPEN SOURCE COM OPEN-METEO (/tempo [Cidade])
+// ----------------------------------------------------
+async function handleTempo(msg, cityQuery) {
+  const city = cityQuery.trim() || "Goiânia";
+  try {
+    const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=pt`);
+    const geoData = await geoRes.json();
+
+    if (!geoData.results || geoData.results.length === 0) {
+      return await apiCall("sendMessage", {
+        chat_id: msg.chat.id,
+        text: `🌤️ Cidade "${city}" não encontrada. Tente ex: <code>/tempo Goiânia</code> ou <code>/tempo São Paulo</code>`,
+        message_thread_id: msg.message_thread_id,
+        parse_mode: "HTML"
+      });
+    }
+
+    const loc = geoData.results[0];
+    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&current_weather=true`);
+    const wData = await weatherRes.json();
+
+    const current = wData.current_weather;
+    const temp = current.temperature;
+    const wind = current.windspeed;
+    const code = current.weathercode;
+
+    let weatherEmoji = "☀️ Ensolarado";
+    if (code >= 1 && code <= 3) weatherEmoji = "⛅ Parcialmente Nublado";
+    else if (code >= 45 && code <= 48) weatherEmoji = "🌫️ Nevoeiro";
+    else if (code >= 51 && code <= 67) weatherEmoji = "🌧️ Chuva Leve / Moderada";
+    else if (code >= 80) weatherEmoji = "🌩️ Tempestade / Chuva Forte";
+
+    const text = `🌤️ <b>PREVISÃO DO TEMPO NA TAVERNA</b> 🛡️\n\n` +
+      `📍 <b>Local:</b> ${loc.name}, ${loc.country}\n` +
+      `🌡️ <b>Temperatura:</b> ${temp}°C (${weatherEmoji})\n` +
+      `💨 <b>Vento:</b> ${wind} km/h\n\n` +
+      `🍺 <i>Clima perfeito para um copo de hidromel na Taverna!</i>`;
+
+    await apiCall("sendMessage", {
+      chat_id: msg.chat.id,
+      text: text,
+      message_thread_id: msg.message_thread_id,
+      parse_mode: "HTML"
+    });
+  } catch (err) {
+    await apiCall("sendMessage", {
+      chat_id: msg.chat.id,
+      text: `Erro ao buscar clima: ${err.message}`,
+      message_thread_id: msg.message_thread_id
+    });
+  }
+}
+
+// ----------------------------------------------------
+// 3. ENQUETES RÁPIDAS NO CHAT (/enquete Tema | Opção1 | Opção2)
+// ----------------------------------------------------
+async function handleEnquete(msg, argsText) {
+  const parts = argsText.split("|").map(p => p.trim());
+  const question = parts[0];
+  const options = parts.slice(1);
+
+  if (!question || options.length < 2) {
+    return await apiCall("sendMessage", {
+      chat_id: msg.chat.id,
+      text: "🗳️ <b>Como criar uma enquete:</b>\n<code>/enquete Qual o melhor jogo? | Counter Strike | Valorant | FIFA</code>",
+      message_thread_id: msg.message_thread_id,
+      parse_mode: "HTML"
+    });
+  }
+
+  await apiCall("sendPoll", {
+    chat_id: msg.chat.id,
+    question: `📊 ${question}`,
+    options: options.slice(0, 10),
+    is_anonymous: false,
+    message_thread_id: msg.message_thread_id
+  });
+}
+
+// ----------------------------------------------------
+// 4. RANKING E XP DOS MEMBROS (/top ou /ranking)
+// ----------------------------------------------------
+async function handleRanking(msg) {
+  const users = Object.values(dbData.userXP).sort((a, b) => b.count - a.count);
+
+  if (users.length === 0) {
+    return await apiCall("sendMessage", {
+      chat_id: msg.chat.id,
+      text: "🏆 Ninguém pontuou na Taverna ainda! Enviem mensagens para subir de nível!",
+      message_thread_id: msg.message_thread_id
+    });
+  }
+
+  let rankingText = `🏆 <b>RANKING DE ENGAJAMENTO DA TAVERNA</b> 🛡️🍺\n\n`;
+  const medals = ["🥇", "🥈", "🥉"];
+
+  users.slice(0, 10).forEach((u, idx) => {
+    const medal = medals[idx] || "⚔️";
+    let title = "Escudeiro";
+    if (u.count >= 50) title = "Grão-Mestre da Taverna";
+    else if (u.count >= 20) title = "Cavaleiro Templário";
+    else if (u.count >= 5) title = "Guardião da Taverna";
+
+    rankingText += `${medal} <b>${idx + 1}º ${escapeHTML(u.name)}</b> - ${u.count} msgs (${title})\n`;
+  });
+
+  rankingText += `\n<i>Continue conversando nos tópicos para subir na hierarquia dos Templários!</i>`;
+
+  await apiCall("sendMessage", {
+    chat_id: msg.chat.id,
+    text: rankingText,
+    message_thread_id: msg.message_thread_id,
+    parse_mode: "HTML"
+  });
+}
+
+// ----------------------------------------------------
+// 5. NOTIFICAÇÃO AUTOMÁTICA EM SEGUNDO PLANO DE JOGOS GRÁTIS
+// ----------------------------------------------------
+async function checkFreeGamesAuto() {
+  try {
+    const res = await fetch(`https://www.gamerpower.com/api/giveaways?platform=pc`);
+    if (!res.ok) return;
+
+    const deals = await res.json();
+    if (deals && deals.length > 0) {
+      const top = deals[0];
+      if (top.id !== dbData.lastFreeGameId) {
+        dbData.lastFreeGameId = top.id;
+        saveDB();
+
+        const text = `🎉 <b>NOVO JOGO 100% GRATUITO DETECTADO!</b> 🎮\n\n` +
+          `📌 <b>${escapeHTML(top.title)}</b>\n` +
+          `💰 De <s>${escapeHTML(top.worth)}</s> por <b>GRÁTIS!</b>\n` +
+          `🌐 Plataforma: ${escapeHTML(top.platforms)}\n\n` +
+          `🔗 <a href="${top.open_giveaway_url}">Resgatar Jogo Grátis Agora</a>`;
+
+        await apiCall("sendMessage", {
+          chat_id: CHAT_ID,
+          text: text,
+          message_thread_id: 11, // Tópico de Jogatina
+          parse_mode: "HTML"
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Erro na verificação de jogos grátis:", e.message);
+  }
+}
+
+// Checa jogos grátis a cada 6 horas automaticamente
+setInterval(checkFreeGamesAuto, 6 * 60 * 60 * 1000);
+
+// ----------------------------------------------------
+// BOAS-VINDAS PARA NOVOS MEMBROS
+// ----------------------------------------------------
 async function handleNewMembers(msg) {
   for (const member of msg.new_chat_members) {
     if (member.is_bot) continue;
@@ -154,12 +380,14 @@ async function handleNewMembers(msg) {
       `Sinta-se em casa para conversar e participar dos nossos tópicos:\n\n` +
       `💬 <b>Prosa da Taverna:</b> Bate-papo geral\n` +
       `🎮 <b>Jogatina Templária:</b> Use <code>/jogar [Jogo]</code> ou <code>/dado 1d20</code>\n` +
-      `🎤 <b>Áudios Lendários:</b> Use <code>/áudio</code> para soltar memes de áudio!\n` +
+      `🤖 <b>Taverneiro IA:</b> Use <code>/ia [Sua pergunta]</code> para conversar com a IA!\n` +
+      `🎤 <b>Áudios Lendários:</b> Use <code>/áudio</code> para memes de áudio virais!\n` +
       `🎬 <b>Cine Templário:</b> Use <code>/filme [Nome]</code> para ver onde assistir grátis!\n` +
-      `🎵 <b>Música Templária:</b> Use <code>/música [Nome]</code> ou <code>/deezer</code> para Deezer/Spotify/YouTube!\n` +
-      `📚 <b>Biblioteca Templária:</b> Use <code>/livro [Nome]</code> para livros em PDF/ePUB!\n` +
-      `💵 <b>Financeiro:</b> Use <code>/dolar</code> para ver cotações em tempo real!\n` +
-      `🎁 <b>Promoções:</b> Use <code>/steam</code> para jogos grátis.`;
+      `🎵 <b>Música Templária:</b> Use <code>/música [Nome]</code> ou <code>/deezer</code>!\n` +
+      `📚 <b>Biblioteca Templária:</b> Use <code>/livro [Nome]</code> para PDF/ePUB grátis!\n` +
+      `🌤️ <b>Clima:</b> Use <code>/tempo [Cidade]</code> para ver a previsão!\n` +
+      `🏆 <b>Ranking:</b> Use <code>/top</code> para ver os membros mais ativos!\n` +
+      `🎁 <b>Promoções:</b> Use <code>/steam</code> para jogos grátis de PC.`;
 
     await apiCall("sendMessage", {
       chat_id: msg.chat.id,
@@ -170,6 +398,9 @@ async function handleNewMembers(msg) {
   }
 }
 
+// ----------------------------------------------------
+// SISTEMA DE MARCAR JOGATINA (/jogar ou /jogatina)
+// ----------------------------------------------------
 async function handleJogar(msg, argsText) {
   const gameName = escapeHTML(argsText.trim() || "Jogatina Geral");
   const organizer = escapeHTML(msg.from ? (msg.from.first_name || msg.from.username || "Um Templário") : "Um Templário");
@@ -201,14 +432,14 @@ async function handleJogar(msg, argsText) {
 
   if (res.ok && res.result) {
     const msgId = res.result.message_id;
-    gameSessions[msgId] = {
+    dbData.gameSessions[msgId] = {
       game: gameName,
       organizer: organizer,
       going: new Set([organizer]),
       maybe: new Set(),
       cant: new Set()
     };
-    saveGameSessions();
+    saveDB();
   }
 }
 
@@ -217,12 +448,12 @@ async function handleCallbackQuery(cb) {
   const user = escapeHTML(cb.from ? (cb.from.first_name || cb.from.username || "Templário") : "Templário");
   const action = cb.data;
 
-  if (!gameSessions[msgId]) {
+  if (!dbData.gameSessions[msgId]) {
     const existingText = cb.message.text || "";
-    gameSessions[msgId] = parseTextToSession(existingText);
+    dbData.gameSessions[msgId] = parseTextToSession(existingText);
   }
 
-  const session = gameSessions[msgId];
+  const session = dbData.gameSessions[msgId];
 
   if (action === "game_going") {
     session.going.add(user);
@@ -238,7 +469,7 @@ async function handleCallbackQuery(cb) {
     session.maybe.delete(user);
   }
 
-  saveGameSessions();
+  saveDB();
 
   const goingList = Array.from(session.going).map(u => `• ${u}`).join("\n") || "Ninguém ainda";
   const maybeList = Array.from(session.maybe).map(u => `• ${u}`).join("\n") || "Ninguém ainda";
@@ -274,12 +505,13 @@ async function handleCallbackQuery(cb) {
   });
 }
 
+// BUSCA DE FILMES
 async function handleFilme(msg, query) {
   const searchTerm = query.trim();
   if (!searchTerm) {
     return await apiCall("sendMessage", {
       chat_id: msg.chat.id,
-      text: "🎬 Digite o nome do filme ou série.\nExemplo: <code>/filme Matrix</code> ou <code>/filme Gladiator</code>",
+      text: "🎬 Digite o nome do filme ou série.\nExemplo: <code>/filme Matrix</code>",
       message_thread_id: msg.message_thread_id,
       parse_mode: "HTML"
     });
@@ -342,6 +574,7 @@ async function handleFilme(msg, query) {
   }
 }
 
+// BUSCA DE MÚSICAS COM DEEZER
 async function handleMusica(msg, query) {
   const searchTerm = query.trim();
   if (!searchTerm) {
@@ -407,31 +640,6 @@ async function handleMusica(msg, query) {
       return;
     }
 
-    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=song&limit=1`);
-    const data = await res.json();
-
-    if (data.results && data.results.length > 0) {
-      const song = data.results[0];
-      const cover = song.artworkUrl100 ? song.artworkUrl100.replace('100x100bb', '600x600bb') : null;
-      const queryEscaped = encodeURIComponent(`${song.artistName} - ${song.trackName}`);
-
-      const text = `🎵 <b>${escapeHTML(song.trackName)}</b>\n` +
-        `👤 <b>Artista:</b> ${escapeHTML(song.artistName)}\n\n` +
-        `🎧 <a href="https://music.youtube.com/search?q=${queryEscaped}">Ouvir no YouTube Music</a>\n` +
-        `💜 <a href="https://www.deezer.com/search/${queryEscaped}">Buscar no Deezer</a>`;
-
-      if (cover) {
-        await apiCall("sendPhoto", {
-          chat_id: msg.chat.id,
-          photo: cover,
-          caption: text,
-          message_thread_id: msg.message_thread_id || 13,
-          parse_mode: "HTML"
-        });
-      }
-      return;
-    }
-
     await apiCall("sendMessage", {
       chat_id: msg.chat.id,
       text: `🎵 Nenhuma música encontrada para "${searchTerm}".`,
@@ -446,6 +654,7 @@ async function handleMusica(msg, query) {
   }
 }
 
+// COTAÇÕES DE MOEDAS
 async function handleDolar(msg) {
   try {
     const res = await fetch(`https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL,BTC-BRL`);
@@ -476,6 +685,7 @@ async function handleDolar(msg) {
   }
 }
 
+// MEMES DE ÁUDIO
 async function handleAudio(msg) {
   const selected = MEMES_VIRAIS_INTERNET[Math.floor(Math.random() * MEMES_VIRAIS_INTERNET.length)];
   const user = escapeHTML(msg.from ? (msg.from.first_name || msg.from.username || "Templário") : "Templário");
@@ -493,6 +703,7 @@ async function handleAudio(msg) {
   });
 }
 
+// BUSCA DE LIVROS
 async function handleLivro(msg, query) {
   const searchTerm = query.trim();
   if (!searchTerm) {
@@ -559,6 +770,7 @@ async function handleLivro(msg, query) {
   }
 }
 
+// PROMOÇÕES DE JOGOS GRÁTIS
 async function handleSteam(msg) {
   try {
     const res = await fetch(`https://www.gamerpower.com/api/giveaways?platform=pc`);
@@ -597,6 +809,7 @@ async function handleSteam(msg) {
   }
 }
 
+// ROLAR DADOS DE RPG
 async function handleDado(msg, argsText) {
   const query = argsText.trim().toLowerCase() || "1d20";
   const match = query.match(/^(\d+)?d(\d+)$/);
@@ -634,6 +847,7 @@ async function handleDado(msg, argsText) {
   });
 }
 
+// CITAÇÃO TEMPLÁRIA
 async function handleFrase(msg) {
   const frases = [
     "⚔️ *Non nobis, Domine, non nobis, sed nomini tuo da gloriam.* (Não a nós, Senhor, mas ao Teu nome dá a glória!)",
@@ -651,17 +865,21 @@ async function handleFrase(msg) {
   });
 }
 
+// AJUDA COMPLETA
 async function handleAjuda(msg) {
-  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS</b> 🍺\n\n` +
-    `Aqui estão todos os comandos funcionais do bot:\n\n` +
-    `💜 <b>/deezer [Nome]</b> ou <b>/música [Nome]</b> - Busca músicas na API do Deezer + Player HD + Spotify/YouTube!\n` +
-    `💵 <b>/dolar</b> ou <b>/btc</b> - Mostra cotação do Dólar, Euro e Bitcoin em tempo real!\n` +
-    `🎬 <b>/filme [Nome]</b> - Busca onde assistir filmes/séries grátis!\n` +
-    `📚 <b>/livro [Nome]</b> - Busca livros em PDF/EPUB grátis!\n` +
-    `🎤 <b>/áudio</b> - Toca +25 memes de áudio virais reais da internet!\n` +
-    `🎮 <b>/jogar [Nome]</b> - Cria votação interativa para marcar partidas de games!\n` +
-    `🎲 <b>/dado 1d20</b> - Rola dados de RPG (ex: 1d20, 2d6) no chat!\n` +
-    `🎁 <b>/steam</b> ou <b>/promo</b> - Mostra jogos 100% gratuitos para PC de hoje!\n` +
+  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v7.0)</b> 🍺\n\n` +
+    `🤖 <b>/ia [pergunta]</b> - Pergunta qualquer coisa ao Taverneiro Inteligente!\n` +
+    `🌤️ <b>/tempo [Cidade]</b> - Previsão do tempo Open Source (Open-Meteo)!\n` +
+    `🗳️ <b>/enquete [Pergunta] | [Opção 1] | [Opção 2]</b> - Cria enquetes no chat!\n` +
+    `🏆 <b>/top</b> ou <b>/ranking</b> - Ver o ranking de engajamento dos Templários!\n` +
+    `💜 <b>/deezer [Nome]</b> ou <b>/música</b> - Busca Deezer + Player HD + Spotify!\n` +
+    `💵 <b>/dolar</b> ou <b>/btc</b> - Cotação do Dólar, Euro e Bitcoin em tempo real!\n` +
+    `🎬 <b>/filme [Nome]</b> - Onde assistir filmes/séries grátis!\n` +
+    `📚 <b>/livro [Nome]</b> - Livros em PDF/EPUB grátis!\n` +
+    `🎤 <b>/áudio</b> - Memes de áudio virais reais da internet!\n` +
+    `🎮 <b>/jogar [Nome]</b> - Cria convocação para partidas de games!\n` +
+    `🎲 <b>/dado 1d20</b> - Rola dados de RPG em tempo real!\n` +
+    `🎁 <b>/steam</b> ou <b>/promo</b> - Jogos 100% gratuitos para PC de hoje!\n` +
     `💡 <b>/ajuda</b> - Mostra esta mensagem.`;
 
   await apiCall("sendMessage", {
@@ -672,6 +890,9 @@ async function handleAjuda(msg) {
   });
 }
 
+// ----------------------------------------------------
+// LOOP PRINCIPAL DE POLLING DO BOT
+// ----------------------------------------------------
 let offset = 0;
 
 async function pollUpdates() {
@@ -694,6 +915,13 @@ async function pollUpdates() {
           const msg = update.message;
           if (!msg) continue;
 
+          // Registro de Atividade de XP
+          if (msg.from && !msg.from.is_bot) {
+            const userId = msg.from.id;
+            const userName = msg.from.first_name || msg.from.username || "Templário";
+            registerUserActivity(userId, userName);
+          }
+
           if (msg.new_chat_members) {
             await handleNewMembers(msg);
             continue;
@@ -715,7 +943,15 @@ async function pollUpdates() {
             const command = rawCommand.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             const argsText = parts.slice(1).join(" ");
 
-            if (command === "/jogar" || command === "/jogatina") {
+            if (command === "/ia" || command === "/pergunta" || command === "/taverneiro") {
+              await handleIA(msg, argsText);
+            } else if (command === "/tempo" || command === "/clima") {
+              await handleTempo(msg, argsText);
+            } else if (command === "/enquete" || command === "/voto") {
+              await handleEnquete(msg, argsText);
+            } else if (command === "/top" || command === "/ranking" || command === "/xp") {
+              await handleRanking(msg);
+            } else if (command === "/jogar" || command === "/jogatina") {
               await handleJogar(msg, argsText);
             } else if (command === "/filme" || command === "/cinema" || command === "/cine") {
               await handleFilme(msg, argsText);
@@ -746,6 +982,6 @@ async function pollUpdates() {
   }
 }
 
-console.log("🛡️ Bot da Taberna dos Templários v6.3 (Repositório Seguro Sem Tokens Expostos) iniciado!");
+console.log("🛡️ Bot da Taberna dos Templários v7.0 (Com IA + Clima + Enquetes + Ranking XP + Alerta de Jogos Grátis) iniciado!");
 console.log("Aguardando novas mensagens e comandos no Telegram...");
 pollUpdates();
