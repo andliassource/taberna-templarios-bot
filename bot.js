@@ -19,8 +19,14 @@ if (fs.existsSync(configPath)) {
 const BOT_URL = `https://api.telegram.org/bot${TOKEN}`;
 const GAMES_DB_FILE = path.join(__dirname, 'games_data.json');
 
-// Carrega o banco de dados de jogatina e XP de membros do disco
-let dbData = { gameSessions: {}, userXP: {}, lastFreeGameId: null };
+// Banco de dados local de jogatina, XP e IDs do Manual Fixado
+let dbData = { 
+  gameSessions: {}, 
+  userXP: {}, 
+  lastFreeGameId: null,
+  manualThreadId: 564,
+  pinnedManualMsgId: 565
+};
 
 function loadDB() {
   if (fs.existsSync(GAMES_DB_FILE)) {
@@ -29,6 +35,8 @@ function loadDB() {
       const parsed = JSON.parse(raw);
       dbData.userXP = parsed.userXP || {};
       dbData.lastFreeGameId = parsed.lastFreeGameId || null;
+      dbData.manualThreadId = parsed.manualThreadId || 564;
+      dbData.pinnedManualMsgId = parsed.pinnedManualMsgId || 565;
       dbData.gameSessions = {};
       if (parsed.gameSessions) {
         for (const id in parsed.gameSessions) {
@@ -52,6 +60,8 @@ function saveDB() {
     const toSave = {
       userXP: dbData.userXP,
       lastFreeGameId: dbData.lastFreeGameId,
+      manualThreadId: dbData.manualThreadId,
+      pinnedManualMsgId: dbData.pinnedManualMsgId,
       gameSessions: {}
     };
     for (const id in dbData.gameSessions) {
@@ -166,7 +176,51 @@ async function apiCall(method, body = {}) {
   }
 }
 
-// 1. IA DO TAVERNEIRO (/ia [pergunta])
+// ----------------------------------------------------
+// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL
+// ----------------------------------------------------
+const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v7.2)\n\n` +
+  `📌 <b>Esta mensagem fica sempre fixada e atualizada com as novas funções!</b>\n\n` +
+  `🤖 <b>INTELIGÊNCIA ARTIFICIAL & DÚVIDAS</b>\n` +
+  `• <code>/ia [pergunta]</code> ou <code>/pergunta</code> - Pergunta ao Taverneiro Inteligente\n\n` +
+  `🎵 <b>MÚSICA & DEEZER (PLAYER NATIVO HD)</b>\n` +
+  `• <code>/música [Nome]</code> ou <code>/deezer</code> - Player flutuante HD com capa e botões Deezer/Spotify/YouTube\n\n` +
+  `🎬 <b>FILMES & SÉRIES (CINE TEMPLÁRIO)</b>\n` +
+  `• <code>/filme [Nome]</code> ou <code>/cinema</code> - Sinopse, capa HD e links grátis (Pluto TV/YouTube)\n\n` +
+  `📚 <b>BIBLIOTECA TEMPLÁRIA</b>\n` +
+  `• <code>/livro [Nome]</code> ou <code>/biblioteca</code> - Livros em PDF e EPUB grátis\n\n` +
+  `🎮 <b>JOGATINA & PROMOÇÕES</b>\n` +
+  `• <code>/jogar [Jogo]</code> ou <code>/jogatina</code> - Convocação interativa com botões de presença\n` +
+  `• <code>/steam</code> ou <code>/promo</code> - Jogos pagos 100% gratuitos de hoje (PC/Steam/Epic)\n\n` +
+  `🎲 <b>RPG, DADOS & ENQUETES</b>\n` +
+  `• <code>/dado 1d20</code> - Rola dados de RPG em tempo real\n` +
+  `• <code>/enquete Tema | Opção 1 | Opção 2</code> - Cria enquetes interativas\n\n` +
+  `🎤 <b>MEMES DE ÁUDIO VIRAIS</b>\n` +
+  `• <code>/áudio</code> ou <code>/efeito</code> - Memes de som reais da internet (UEPA, RAPAZ, CAVALO, RECEBA, etc.)\n\n` +
+  `🌤️ <b>CLIMA & FINANCEIRO</b>\n` +
+  `• <code>/tempo [Cidade]</code> - Temperatura e clima em tempo real (Open-Meteo)\n` +
+  `• <code>/dolar</code> ou <code>/btc</code> - Cotações em tempo real do Dólar, Euro e Bitcoin\n\n` +
+  `🏆 <b>RANKING DE ENGAJAMENTO (XP)</b>\n` +
+  `• <code>/top</code> ou <code>/ranking</code> - Placar dos membros mais ativos da Taverna\n\n` +
+  `🛡️ <i>Sempre que novos comandos forem lançados, esta mensagem será atualizada automaticamente!</i>`;
+
+async function syncPinnedManual() {
+  if (dbData.pinnedManualMsgId) {
+    try {
+      await apiCall("editMessageText", {
+        chat_id: CHAT_ID,
+        message_id: dbData.pinnedManualMsgId,
+        text: OFFICIAL_MANUAL_TEXT,
+        parse_mode: "HTML"
+      });
+      console.log("📌 Mensagem fixada do manual sincronizada e atualizada com sucesso!");
+    } catch (e) {
+      console.error("Erro ao sincronizar mensagem fixada do manual:", e.message);
+    }
+  }
+}
+
+// IA DO TAVERNEIRO (/ia [pergunta])
 async function handleIA(msg, prompt) {
   const userQuery = prompt.trim();
   if (!userQuery) {
@@ -212,7 +266,7 @@ async function handleIA(msg, prompt) {
   }
 }
 
-// 2. CLIMA OPEN SOURCE COM OPEN-METEO (/tempo [Cidade])
+// CLIMA OPEN SOURCE COM OPEN-METEO (/tempo [Cidade])
 async function handleTempo(msg, cityQuery) {
   const city = cityQuery.trim() || "Goiânia";
   try {
@@ -264,7 +318,7 @@ async function handleTempo(msg, cityQuery) {
   }
 }
 
-// 3. ENQUETES RÁPIDAS NO CHAT (/enquete Tema | Opção1 | Opção2)
+// ENQUETES RÁPIDAS NO CHAT (/enquete Tema | Opção1 | Opção2)
 async function handleEnquete(msg, argsText) {
   const parts = argsText.split("|").map(p => p.trim());
   const question = parts[0];
@@ -288,7 +342,7 @@ async function handleEnquete(msg, argsText) {
   });
 }
 
-// 4. RANKING E XP DOS MEMBROS (/top ou /ranking)
+// RANKING E XP DOS MEMBROS (/top ou /ranking)
 async function handleRanking(msg) {
   const users = Object.values(dbData.userXP).sort((a, b) => b.count - a.count);
 
@@ -323,7 +377,7 @@ async function handleRanking(msg) {
   });
 }
 
-// 5. NOTIFICAÇÃO AUTOMÁTICA EM SEGUNDO PLANO DE JOGOS GRÁTIS
+// NOTIFICAÇÃO AUTOMÁTICA EM SEGUNDO PLANO DE JOGOS GRÁTIS
 async function checkFreeGamesAuto() {
   try {
     const res = await fetch(`https://www.gamerpower.com/api/giveaways?platform=pc`);
@@ -586,7 +640,6 @@ async function handleMusica(msg, query) {
       const youtubeMusicLink = `https://music.youtube.com/search?q=${queryEscaped}`;
       const spotifyUrl = `https://open.spotify.com/search/${queryEscaped}`;
 
-      // Envia o Player de Áudio Flutuante Nativo do Telegram com Capa HD e Controles
       if (previewUrl) {
         await apiCall("sendAudio", {
           chat_id: msg.chat.id,
@@ -856,19 +909,15 @@ async function handleFrase(msg) {
 
 // AJUDA COMPLETA
 async function handleAjuda(msg) {
-  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v7.1)</b> 🍺\n\n` +
-    `🎵 <b>/deezer [Nome]</b> ou <b>/música [Nome]</b> - Toca o player nativo HD do Telegram com Capa e Botões Inline!\n` +
-    `🤖 <b>/ia [pergunta]</b> - Pergunta qualquer coisa ao Taverneiro Inteligente!\n` +
-    `🌤️ <b>/tempo [Cidade]</b> - Previsão do tempo Open Source (Open-Meteo)!\n` +
-    `🗳️ <b>/enquete [Pergunta] | [Opção 1] | [Opção 2]</b> - Cria enquetes no chat!\n` +
-    `🏆 <b>/top</b> ou <b>/ranking</b> - Ver o ranking de engajamento dos Templários!\n` +
-    `💵 <b>/dolar</b> ou <b>/btc</b> - Cotação do Dólar, Euro e Bitcoin em tempo real!\n` +
-    `🎬 <b>/filme [Nome]</b> - Onde assistir filmes/séries grátis!\n` +
-    `📚 <b>/livro [Nome]</b> - Livros em PDF/EPUB grátis!\n` +
-    `🎤 <b>/áudio</b> - Memes de áudio virais reais da internet!\n` +
-    `🎮 <b>/jogar [Nome]</b> - Cria convocação para partidas de games!\n` +
-    `🎲 <b>/dado 1d20</b> - Rola dados de RPG em tempo real!\n` +
-    `🎁 <b>/steam</b> ou <b>/promo</b> - Jogos 100% gratuitos para PC de hoje!\n` +
+  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v7.2)</b> 🍺\n\n` +
+    `📌 <i>Consulte o tópico de <b>📜 Manual & Comandos</b> para a lista completa fixada!</i>\n\n` +
+    `🤖 <b>/ia [pergunta]</b> - Pergunta qualquer coisa ao Taverneiro!\n` +
+    `🎵 <b>/deezer [Nome]</b> - Player flutuante HD de áudio com capas!\n` +
+    `🌤️ <b>/tempo [Cidade]</b> - Previsão do tempo Open Source!\n` +
+    `🗳️ <b>/enquete Tema | Opc1 | Opc2</b> - Cria enquetes no chat!\n` +
+    `🏆 <b>/top</b> - Ranking de membros mais ativos!\n` +
+    `🎮 <b>/jogar [Nome]</b> - Convocação para partidas de games!\n` +
+    `🎁 <b>/steam</b> - Jogos 100% gratuitos para PC de hoje!\n` +
     `💡 <b>/ajuda</b> - Mostra esta mensagem.`;
 
   await apiCall("sendMessage", {
@@ -882,6 +931,9 @@ async function handleAjuda(msg) {
 let offset = 0;
 
 async function pollUpdates() {
+  // Sincroniza a mensagem fixada do manual na inicialização
+  await syncPinnedManual();
+
   while (true) {
     try {
       const res = await apiCall("getUpdates", {
@@ -967,6 +1019,6 @@ async function pollUpdates() {
   }
 }
 
-console.log("🛡️ Bot da Taberna dos Templários v7.1 (Com Player Flutuante Nativo de Áudio + Capas HD + Botões Inline) iniciado!");
+console.log("🛡️ Bot da Taberna dos Templários v7.2 (Com Auto-Update de Mensagem Fixada do Manual) iniciado!");
 console.log("Aguardando novas mensagens e comandos no Telegram...");
 pollUpdates();
