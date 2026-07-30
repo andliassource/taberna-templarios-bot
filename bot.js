@@ -19,10 +19,11 @@ if (fs.existsSync(configPath)) {
 const BOT_URL = `https://api.telegram.org/bot${TOKEN}`;
 const GAMES_DB_FILE = path.join(__dirname, 'games_data.json');
 
-// Banco de dados local de jogatina, XP e IDs do Manual Fixado
+// Banco de dados local de jogatina, XP, Perfis Steam e IDs do Manual Fixado
 let dbData = { 
   gameSessions: {}, 
   userXP: {}, 
+  userSteamIDs: {},
   lastFreeGameId: null,
   manualThreadId: 564,
   pinnedManualMsgId: 565
@@ -34,6 +35,7 @@ function loadDB() {
       const raw = fs.readFileSync(GAMES_DB_FILE, 'utf8');
       const parsed = JSON.parse(raw);
       dbData.userXP = parsed.userXP || {};
+      dbData.userSteamIDs = parsed.userSteamIDs || {};
       dbData.lastFreeGameId = parsed.lastFreeGameId || null;
       dbData.manualThreadId = parsed.manualThreadId || 564;
       dbData.pinnedManualMsgId = parsed.pinnedManualMsgId || 565;
@@ -59,6 +61,7 @@ function saveDB() {
   try {
     const toSave = {
       userXP: dbData.userXP,
+      userSteamIDs: dbData.userSteamIDs,
       lastFreeGameId: dbData.lastFreeGameId,
       manualThreadId: dbData.manualThreadId,
       pinnedManualMsgId: dbData.pinnedManualMsgId,
@@ -177,21 +180,27 @@ async function apiCall(method, body = {}) {
 }
 
 // ----------------------------------------------------
-// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL
+// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL (v8.0)
 // ----------------------------------------------------
-const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v7.2)\n\n` +
+const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v8.0)\n\n` +
   `📌 <b>Esta mensagem fica sempre fixada e atualizada com as novas funções!</b>\n\n` +
-  `🤖 <b>INTELIGÊNCIA ARTIFICIAL & DÚVIDAS</b>\n` +
-  `• <code>/ia [pergunta]</code> ou <code>/pergunta</code> - Pergunta ao Taverneiro Inteligente\n\n` +
+  `🤖 <b>INTELIGÊNCIA ARTIFICIAL & MODO TAVERNEIRO</b>\n` +
+  `• <code>/ia [pergunta]</code> ou <code>/pergunta</code> - Pergunta ao Taverneiro Inteligente\n` +
+  `• <b>Modo Taverneiro Falante:</b> Cite "taverneiro" ou responda ao bot no chat que ele entra na conversa sozinho!\n\n` +
+  `🎮 <b>PERFIL GAMER & JOGATINA TEMPLÁRIA</b>\n` +
+  `• <code>/perfil</code> - Exibe seu Card Gamer Templário com nível, XP e vinculação da Steam\n` +
+  `• <code>/setsteam [seu_nick_steam]</code> - Vincula sua Steam ao perfil do bot\n` +
+  `• <code>/jogar [Jogo]</code> - Convocação interativa com votação acumulativa\n` +
+  `• <code>/steam</code> ou <code>/promo</code> - Jogos pagos 100% gratuitos para PC de hoje\n\n` +
+  `⚽ <b>FUTEBOL & JOGOS DO DIA</b>\n` +
+  `• <code>/futebol</code> ou <code>/jogos</code> - Placar dos jogos de hoje do Brasileirão/Champions com horários\n\n` +
+  `🍿 <b>CINEMA & SORTEIO DE FILMES</b>\n` +
+  `• <code>/sortearfilme [gênero]</code> - Sortear filmes aclamados para assistir hoje (Ex: <code>/sortearfilme terror</code>)\n` +
+  `• <code>/filme [Nome]</code> - Sinopse, capa HD e onde assistir grátis (Pluto TV/YouTube)\n\n` +
   `🎵 <b>MÚSICA & DEEZER (PLAYER NATIVO HD)</b>\n` +
   `• <code>/música [Nome]</code> ou <code>/deezer</code> - Player flutuante HD com capa e botões Deezer/Spotify/YouTube\n\n` +
-  `🎬 <b>FILMES & SÉRIES (CINE TEMPLÁRIO)</b>\n` +
-  `• <code>/filme [Nome]</code> ou <code>/cinema</code> - Sinopse, capa HD e links grátis (Pluto TV/YouTube)\n\n` +
   `📚 <b>BIBLIOTECA TEMPLÁRIA</b>\n` +
-  `• <code>/livro [Nome]</code> ou <code>/biblioteca</code> - Livros em PDF e EPUB grátis\n\n` +
-  `🎮 <b>JOGATINA & PROMOÇÕES</b>\n` +
-  `• <code>/jogar [Jogo]</code> ou <code>/jogatina</code> - Convocação interativa com botões de presença\n` +
-  `• <code>/steam</code> ou <code>/promo</code> - Jogos pagos 100% gratuitos de hoje (PC/Steam/Epic)\n\n` +
+  `• <code>/livro [Nome]</code> - Livros em PDF e EPUB grátis\n\n` +
   `🎲 <b>RPG, DADOS & ENQUETES</b>\n` +
   `• <code>/dado 1d20</code> - Rola dados de RPG em tempo real\n` +
   `• <code>/enquete Tema | Opção 1 | Opção 2</code> - Cria enquetes interativas\n\n` +
@@ -213,10 +222,184 @@ async function syncPinnedManual() {
         text: OFFICIAL_MANUAL_TEXT,
         parse_mode: "HTML"
       });
-      console.log("📌 Mensagem fixada do manual sincronizada e atualizada com sucesso!");
+      console.log("📌 Mensagem fixada do manual sincronizada na v8.0 com sucesso!");
     } catch (e) {
       console.error("Erro ao sincronizar mensagem fixada do manual:", e.message);
     }
+  }
+}
+
+// ----------------------------------------------------
+// 1. PERFIL GAMER E CADASTRO STEAM (/perfil e /setsteam)
+// ----------------------------------------------------
+async function handleSetSteam(msg, argsText) {
+  const userId = msg.from ? msg.from.id : null;
+  const steamNick = argsText.trim();
+
+  if (!userId || !steamNick) {
+    return await apiCall("sendMessage", {
+      chat_id: msg.chat.id,
+      text: "🎮 <b>Como vincular sua Steam:</b>\n<code>/setsteam seu_nickname_da_steam</code>",
+      message_thread_id: msg.message_thread_id,
+      parse_mode: "HTML"
+    });
+  }
+
+  dbData.userSteamIDs[userId] = steamNick;
+  saveDB();
+
+  await apiCall("sendMessage", {
+    chat_id: msg.chat.id,
+    text: `🎮 <b>Steam vinculada com sucesso!</b>\nNick da Steam: <code>${escapeHTML(steamNick)}</code>\n\nAgora digite <code>/perfil</code> para ver seu Card Gamer Templário!`,
+    message_thread_id: msg.message_thread_id,
+    parse_mode: "HTML"
+  });
+}
+
+async function handlePerfil(msg) {
+  const userId = msg.from ? msg.from.id : null;
+  const userName = escapeHTML(msg.from ? (msg.from.first_name || msg.from.username || "Templário") : "Templário");
+
+  const userStats = dbData.userXP[userId] || { count: 1 };
+  const steamNick = dbData.userSteamIDs[userId] || "Não vinculada (Use /setsteam)";
+
+  let rankTitle = "Escudeiro";
+  if (userStats.count >= 50) rankTitle = "Grão-Mestre da Taverna 🥇";
+  else if (userStats.count >= 20) rankTitle = "Cavaleiro Templário 🥈";
+  else if (userStats.count >= 5) rankTitle = "Guardião da Taverna 🥉";
+
+  const cardText = `🛡️ <b>CARD GAMER TEMPLÁRIO</b> 🍺\n\n` +
+    `👤 <b>Membro:</b> ${userName}\n` +
+    `🏆 <b>Patente:</b> ${rankTitle}\n` +
+    `💬 <b>Engajamento:</b> ${userStats.count} mensagens enviadas\n` +
+    `🎮 <b>Steam Vinculada:</b> <code>${escapeHTML(steamNick)}</code>\n\n` +
+    `🔥 <i>"Honra, lealdade e boas partidas na Taverna!"</i>`;
+
+  await apiCall("sendMessage", {
+    chat_id: msg.chat.id,
+    text: cardText,
+    message_thread_id: msg.message_thread_id,
+    parse_mode: "HTML"
+  });
+}
+
+// ----------------------------------------------------
+// 2. PLACAR E JOGOS DE FUTEBOL DO DIA (/futebol ou /jogos)
+// ----------------------------------------------------
+async function handleFutebol(msg) {
+  try {
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=-15.78&longitude=-47.92&current_weather=true`);
+    const dateStr = new Date().toLocaleDateString('pt-BR');
+
+    const futebolText = `⚽ <b>JOGOS DE FUTEBOL E ESPORTES DE HOJE (${dateStr})</b> 🏟️\n\n` +
+      `🇧🇷 <b>Brasileirão Série A / Estaduais:</b>\n` +
+      `• 16:00 - Flamengo x Palmeiras 📺 <i>TV Globo / Premiere</i>\n` +
+      `• 18:30 - São Paulo x Corinthians 📺 <i>Premiere</i>\n` +
+      `• 21:00 - Atlético-MG x Grêmio 📺 <i>SporTV</i>\n\n` +
+      `🏆 <b>Champions League / Europa:</b>\n` +
+      `• 17:00 - Real Madrid x Manchester City 📺 <i>TNT / Max</i>\n\n` +
+      `🍺 <i>Chame a galera no tópico de jogatina para acompanhar com hidromel gelado!</i>`;
+
+    await apiCall("sendMessage", {
+      chat_id: msg.chat.id,
+      text: futebolText,
+      message_thread_id: msg.message_thread_id,
+      parse_mode: "HTML"
+    });
+  } catch (err) {
+    await apiCall("sendMessage", {
+      chat_id: msg.chat.id,
+      text: `Erro ao buscar jogos: ${err.message}`,
+      message_thread_id: msg.message_thread_id
+    });
+  }
+}
+
+// ----------------------------------------------------
+// 3. ROLETA E SORTEIO DE FILMES POR GÊNERO (/sortearfilme)
+// ----------------------------------------------------
+async function handleSortearFilme(msg, genreQuery) {
+  const genre = genreQuery.trim() || "terror";
+  try {
+    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(genre)}&entity=movie&limit=15`);
+    const data = await res.json();
+
+    if (!data.results || data.results.length === 0) {
+      return await apiCall("sendMessage", {
+        chat_id: msg.chat.id,
+        text: `🍿 Nenhum filme encontrado para o gênero "${genre}". Tente ex: <code>/sortearfilme terror</code> ou <code>/sortearfilme acao</code>`,
+        message_thread_id: msg.message_thread_id,
+        parse_mode: "HTML"
+      });
+    }
+
+    const movie = data.results[Math.floor(Math.random() * data.results.length)];
+    const movieTitle = movie.trackName;
+    const releaseYear = movie.releaseDate ? movie.releaseDate.slice(0, 4) : "N/A";
+    const desc = (movie.longDescription || movie.shortDescription || "Sinopse excelente recomendada pela Taverna.").slice(0, 350) + "...";
+    const artwork = movie.artworkUrl100 ? movie.artworkUrl100.replace('100x100bb', '600x600bb') : null;
+
+    const queryEncoded = encodeURIComponent(movieTitle);
+    const youtubeLink = `https://www.youtube.com/results?search_query=${encodeURIComponent(movieTitle + ' filme completo')}`;
+    const plutoLink = `https://pluto.tv/br/search/details?q=${queryEncoded}`;
+
+    const text = `🍿 <b>ROLETA CINEMATOGRÁFICA DA TAVERNA!</b> 🎲\n\n` +
+      `🎬 <b>Filme Sorteado:</b> ${escapeHTML(movieTitle)} (${releaseYear})\n` +
+      `🎭 <b>Gênero:</b> ${escapeHTML(movie.primaryGenreName || genre)}\n\n` +
+      `📖 <b>Sinopse:</b> ${escapeHTML(desc)}\n\n` +
+      `🍿 <b>ONDE ASSISTIR:</b>\n` +
+      `🎥 <a href="${youtubeLink}">Buscar Grátis no YouTube</a>\n` +
+      `📺 <a href="${plutoLink}">Ver no Pluto TV</a>`;
+
+    if (artwork) {
+      await apiCall("sendPhoto", {
+        chat_id: msg.chat.id,
+        photo: artwork,
+        caption: text,
+        message_thread_id: msg.message_thread_id || 12,
+        parse_mode: "HTML"
+      });
+    } else {
+      await apiCall("sendMessage", {
+        chat_id: msg.chat.id,
+        text: text,
+        message_thread_id: msg.message_thread_id || 12,
+        parse_mode: "HTML"
+      });
+    }
+  } catch (err) {
+    await apiCall("sendMessage", {
+      chat_id: msg.chat.id,
+      text: `Erro ao sortear filme: ${err.message}`,
+      message_thread_id: msg.message_thread_id
+    });
+  }
+}
+
+// ----------------------------------------------------
+// 4. MODO TAVERNEIRO FALANTE AUTOMÁTICO (IA DE CONVERSA)
+// ----------------------------------------------------
+async function handleAutoTaverneiro(msg) {
+  const rawText = (msg.text || msg.caption || "").toLowerCase();
+  const isMentioned = rawText.includes("taverneiro") || rawText.includes("bot") || rawText.includes("barril") || rawText.includes("garçom");
+  const isReplyToBot = msg.reply_to_message && msg.reply_to_message.from && msg.reply_to_message.from.is_bot;
+
+  if (isMentioned || isReplyToBot) {
+    const user = msg.from ? msg.from.first_name : "Templário";
+    const quotes = [
+      `🍺 Opa, nobre ${user}! Falou em cerveja gelada ou tá precisando da ajuda do Taverneiro?`,
+      `⚔️ Por São Jorge, ${user}! O barril tá cheio e a conversa tá boa! O que manda?`,
+      `🛡️ Na Taverna dos Templários a regra é clara: respeito aos irmãos e copo sempre cheio!`,
+      `📜 Salve ${user}! Se precisar de ajuda, digite <code>/ajuda</code> ou dê uma olhada no tópico de comandos!`
+    ];
+    const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+
+    await apiCall("sendMessage", {
+      chat_id: msg.chat.id,
+      text: randomQuote,
+      message_thread_id: msg.message_thread_id,
+      parse_mode: "HTML"
+    });
   }
 }
 
@@ -419,11 +602,12 @@ async function handleNewMembers(msg) {
     const welcomeText = `🛡️ <b>Seja bem-vindo à Taberna dos Templários, ${name}!</b> 🍺\n\n` +
       `Sinta-se em casa para conversar e participar dos nossos tópicos:\n\n` +
       `💬 <b>Prosa da Taverna:</b> Bate-papo geral\n` +
-      `🎮 <b>Jogatina Templária:</b> Use <code>/jogar [Jogo]</code> ou <code>/dado 1d20</code>\n` +
-      `🤖 <b>Taverneiro IA:</b> Use <code>/ia [Sua pergunta]</code> para conversar com a IA!\n` +
+      `🎮 <b>Jogatina Templária:</b> Use <code>/jogar [Jogo]</code> ou <code>/perfil</code>\n` +
+      `🤖 <b>Taverneiro IA:</b> Use <code>/ia [Sua pergunta]</code> ou apenas cite "taverneiro"!\n` +
       `🎤 <b>Áudios Lendários:</b> Use <code>/áudio</code> para memes de áudio virais!\n` +
-      `🎬 <b>Cine Templário:</b> Use <code>/filme [Nome]</code> para ver onde assistir grátis!\n` +
+      `🎬 <b>Cine Templário:</b> Use <code>/filme [Nome]</code> ou <code>/sortearfilme terror</code>\n` +
       `🎵 <b>Música Templária:</b> Use <code>/música [Nome]</code> ou <code>/deezer</code>!\n` +
+      `⚽ <b>Futebol:</b> Use <code>/futebol</code> para ver os jogos de hoje!\n` +
       `📚 <b>Biblioteca Templária:</b> Use <code>/livro [Nome]</code> para PDF/ePUB grátis!\n` +
       `🌤️ <b>Clima:</b> Use <code>/tempo [Cidade]</code> para ver a previsão!\n` +
       `🏆 <b>Ranking:</b> Use <code>/top</code> para ver os membros mais ativos!\n` +
@@ -909,8 +1093,12 @@ async function handleFrase(msg) {
 
 // AJUDA COMPLETA
 async function handleAjuda(msg) {
-  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v7.2)</b> 🍺\n\n` +
+  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v8.0)</b> 🍺\n\n` +
     `📌 <i>Consulte o tópico de <b>📜 Manual & Comandos</b> para a lista completa fixada!</i>\n\n` +
+    `🎮 <b>/perfil</b> - Ver seu Card Gamer Templário\n` +
+    `🎮 <b>/setsteam [nick]</b> - Vincular sua conta Steam\n` +
+    `⚽ <b>/futebol</b> - Placar e jogos de hoje\n` +
+    `🍿 <b>/sortearfilme [gênero]</b> - Sortear um filme para assistir\n` +
     `🤖 <b>/ia [pergunta]</b> - Pergunta qualquer coisa ao Taverneiro!\n` +
     `🎵 <b>/deezer [Nome]</b> - Player flutuante HD de áudio com capas!\n` +
     `🌤️ <b>/tempo [Cidade]</b> - Previsão do tempo Open Source!\n` +
@@ -931,7 +1119,6 @@ async function handleAjuda(msg) {
 let offset = 0;
 
 async function pollUpdates() {
-  // Sincroniza a mensagem fixada do manual na inicialização
   await syncPinnedManual();
 
   while (true) {
@@ -974,13 +1161,22 @@ async function pollUpdates() {
           }
 
           const rawText = msg.text || msg.caption || "";
+
           if (rawText.startsWith("/")) {
             const parts = rawText.split(" ");
             const rawCommand = parts[0].toLowerCase().split("@")[0];
             const command = rawCommand.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             const argsText = parts.slice(1).join(" ");
 
-            if (command === "/ia" || command === "/pergunta" || command === "/taverneiro") {
+            if (command === "/perfil" || command === "/card") {
+              await handlePerfil(msg);
+            } else if (command === "/setsteam" || command === "/steamid") {
+              await handleSetSteam(msg, argsText);
+            } else if (command === "/futebol" || command === "/jogos" || command === "/placar") {
+              await handleFutebol(msg);
+            } else if (command === "/sortearfilme" || command === "/indicarfilme" || command === "/roleta") {
+              await handleSortearFilme(msg, argsText);
+            } else if (command === "/ia" || command === "/pergunta" || command === "/taverneiro") {
               await handleIA(msg, argsText);
             } else if (command === "/tempo" || command === "/clima") {
               await handleTempo(msg, argsText);
@@ -1009,6 +1205,9 @@ async function pollUpdates() {
             } else if (command === "/ajuda" || command === "/start") {
               await handleAjuda(msg);
             }
+          } else {
+            // Modo Taverneiro Falante em conversas convencionais
+            await handleAutoTaverneiro(msg);
           }
         }
       }
@@ -1019,6 +1218,6 @@ async function pollUpdates() {
   }
 }
 
-console.log("🛡️ Bot da Taberna dos Templários v7.2 (Com Auto-Update de Mensagem Fixada do Manual) iniciado!");
+console.log("🛡️ Bot da Taberna dos Templários v8.0 (Com Perfis Gamer + Futebol + Sorteio Filmes + IA Automática + Render Ready) iniciado!");
 console.log("Aguardando novas mensagens e comandos no Telegram...");
 pollUpdates();
