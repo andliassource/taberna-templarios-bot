@@ -166,9 +166,7 @@ async function apiCall(method, body = {}) {
   }
 }
 
-// ----------------------------------------------------
 // 1. IA DO TAVERNEIRO (/ia [pergunta])
-// ----------------------------------------------------
 async function handleIA(msg, prompt) {
   const userQuery = prompt.trim();
   if (!userQuery) {
@@ -214,9 +212,7 @@ async function handleIA(msg, prompt) {
   }
 }
 
-// ----------------------------------------------------
-// 2. CLIMA 100% OPEN SOURCE COM OPEN-METEO (/tempo [Cidade])
-// ----------------------------------------------------
+// 2. CLIMA OPEN SOURCE COM OPEN-METEO (/tempo [Cidade])
 async function handleTempo(msg, cityQuery) {
   const city = cityQuery.trim() || "Goiânia";
   try {
@@ -268,9 +264,7 @@ async function handleTempo(msg, cityQuery) {
   }
 }
 
-// ----------------------------------------------------
 // 3. ENQUETES RÁPIDAS NO CHAT (/enquete Tema | Opção1 | Opção2)
-// ----------------------------------------------------
 async function handleEnquete(msg, argsText) {
   const parts = argsText.split("|").map(p => p.trim());
   const question = parts[0];
@@ -294,9 +288,7 @@ async function handleEnquete(msg, argsText) {
   });
 }
 
-// ----------------------------------------------------
 // 4. RANKING E XP DOS MEMBROS (/top ou /ranking)
-// ----------------------------------------------------
 async function handleRanking(msg) {
   const users = Object.values(dbData.userXP).sort((a, b) => b.count - a.count);
 
@@ -331,9 +323,7 @@ async function handleRanking(msg) {
   });
 }
 
-// ----------------------------------------------------
 // 5. NOTIFICAÇÃO AUTOMÁTICA EM SEGUNDO PLANO DE JOGOS GRÁTIS
-// ----------------------------------------------------
 async function checkFreeGamesAuto() {
   try {
     const res = await fetch(`https://www.gamerpower.com/api/giveaways?platform=pc`);
@@ -355,7 +345,7 @@ async function checkFreeGamesAuto() {
         await apiCall("sendMessage", {
           chat_id: CHAT_ID,
           text: text,
-          message_thread_id: 11, // Tópico de Jogatina
+          message_thread_id: 11,
           parse_mode: "HTML"
         });
       }
@@ -365,12 +355,8 @@ async function checkFreeGamesAuto() {
   }
 }
 
-// Checa jogos grátis a cada 6 horas automaticamente
 setInterval(checkFreeGamesAuto, 6 * 60 * 60 * 1000);
 
-// ----------------------------------------------------
-// BOAS-VINDAS PARA NOVOS MEMBROS
-// ----------------------------------------------------
 async function handleNewMembers(msg) {
   for (const member of msg.new_chat_members) {
     if (member.is_bot) continue;
@@ -398,9 +384,6 @@ async function handleNewMembers(msg) {
   }
 }
 
-// ----------------------------------------------------
-// SISTEMA DE MARCAR JOGATINA (/jogar ou /jogatina)
-// ----------------------------------------------------
 async function handleJogar(msg, argsText) {
   const gameName = escapeHTML(argsText.trim() || "Jogatina Geral");
   const organizer = escapeHTML(msg.from ? (msg.from.first_name || msg.from.username || "Um Templário") : "Um Templário");
@@ -574,7 +557,7 @@ async function handleFilme(msg, query) {
   }
 }
 
-// BUSCA DE MÚSICAS COM DEEZER
+// BUSCA DE MÚSICAS COM PLAYER NATIVO DO TELEGRAM OTIMIZADO
 async function handleMusica(msg, query) {
   const searchTerm = query.trim();
   if (!searchTerm) {
@@ -603,39 +586,45 @@ async function handleMusica(msg, query) {
       const youtubeMusicLink = `https://music.youtube.com/search?q=${queryEscaped}`;
       const spotifyUrl = `https://open.spotify.com/search/${queryEscaped}`;
 
-      const text = `🎵 <b>${escapeHTML(songTitle)}</b>\n` +
-        `👤 <b>Artista:</b> ${escapeHTML(artist)}\n` +
-        `💿 <b>Álbum:</b> ${escapeHTML(album)}\n\n` +
-        `🎧 <b>ONDE OUVIR E DEEZER:</b>\n` +
-        `💜 <a href="${deezerLink}">Ouvir Completo no Deezer</a>\n` +
-        `▶️ <a href="${youtubeMusicLink}">Ouvir no YouTube Music</a>\n` +
-        `🟢 <a href="${spotifyUrl}">Ouvir no Spotify</a>`;
-
-      if (cover) {
-        await apiCall("sendPhoto", {
-          chat_id: msg.chat.id,
-          photo: cover,
-          caption: text,
-          message_thread_id: msg.message_thread_id || 13,
-          parse_mode: "HTML"
-        });
-      } else {
-        await apiCall("sendMessage", {
-          chat_id: msg.chat.id,
-          text: text,
-          message_thread_id: msg.message_thread_id || 13,
-          parse_mode: "HTML"
-        });
-      }
-
+      // Envia o Player de Áudio Flutuante Nativo do Telegram com Capa HD e Controles
       if (previewUrl) {
         await apiCall("sendAudio", {
           chat_id: msg.chat.id,
           audio: previewUrl,
-          title: `${songTitle} (Deezer Preview)`,
+          title: songTitle,
           performer: artist,
-          message_thread_id: msg.message_thread_id || 13
+          thumbnail: cover,
+          caption: `🎵 <b>${escapeHTML(songTitle)}</b>\n👤 <b>Artista:</b> ${escapeHTML(artist)}\n💿 <b>Álbum:</b> ${escapeHTML(album)}`,
+          message_thread_id: msg.message_thread_id || 13,
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "💜 Ouvir no Deezer", url: deezerLink },
+                { text: "▶️ YouTube Music", url: youtubeMusicLink },
+                { text: "🟢 Spotify", url: spotifyUrl }
+              ]
+            ]
+          }
         });
+      } else {
+        const text = `🎵 <b>${escapeHTML(songTitle)}</b>\n` +
+          `👤 <b>Artista:</b> ${escapeHTML(artist)}\n` +
+          `💿 <b>Álbum:</b> ${escapeHTML(album)}\n\n` +
+          `🎧 <b>ONDE OUVIR:</b>\n` +
+          `💜 <a href="${deezerLink}">Ouvir Completo no Deezer</a>\n` +
+          `▶️ <a href="${youtubeMusicLink}">Ouvir no YouTube Music</a>\n` +
+          `🟢 <a href="${spotifyUrl}">Ouvir no Spotify</a>`;
+
+        if (cover) {
+          await apiCall("sendPhoto", {
+            chat_id: msg.chat.id,
+            photo: cover,
+            caption: text,
+            message_thread_id: msg.message_thread_id || 13,
+            parse_mode: "HTML"
+          });
+        }
       }
       return;
     }
@@ -867,12 +856,12 @@ async function handleFrase(msg) {
 
 // AJUDA COMPLETA
 async function handleAjuda(msg) {
-  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v7.0)</b> 🍺\n\n` +
+  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v7.1)</b> 🍺\n\n` +
+    `🎵 <b>/deezer [Nome]</b> ou <b>/música [Nome]</b> - Toca o player nativo HD do Telegram com Capa e Botões Inline!\n` +
     `🤖 <b>/ia [pergunta]</b> - Pergunta qualquer coisa ao Taverneiro Inteligente!\n` +
     `🌤️ <b>/tempo [Cidade]</b> - Previsão do tempo Open Source (Open-Meteo)!\n` +
     `🗳️ <b>/enquete [Pergunta] | [Opção 1] | [Opção 2]</b> - Cria enquetes no chat!\n` +
     `🏆 <b>/top</b> ou <b>/ranking</b> - Ver o ranking de engajamento dos Templários!\n` +
-    `💜 <b>/deezer [Nome]</b> ou <b>/música</b> - Busca Deezer + Player HD + Spotify!\n` +
     `💵 <b>/dolar</b> ou <b>/btc</b> - Cotação do Dólar, Euro e Bitcoin em tempo real!\n` +
     `🎬 <b>/filme [Nome]</b> - Onde assistir filmes/séries grátis!\n` +
     `📚 <b>/livro [Nome]</b> - Livros em PDF/EPUB grátis!\n` +
@@ -890,9 +879,6 @@ async function handleAjuda(msg) {
   });
 }
 
-// ----------------------------------------------------
-// LOOP PRINCIPAL DE POLLING DO BOT
-// ----------------------------------------------------
 let offset = 0;
 
 async function pollUpdates() {
@@ -915,7 +901,6 @@ async function pollUpdates() {
           const msg = update.message;
           if (!msg) continue;
 
-          // Registro de Atividade de XP
           if (msg.from && !msg.from.is_bot) {
             const userId = msg.from.id;
             const userName = msg.from.first_name || msg.from.username || "Templário";
@@ -982,6 +967,6 @@ async function pollUpdates() {
   }
 }
 
-console.log("🛡️ Bot da Taberna dos Templários v7.0 (Com IA + Clima + Enquetes + Ranking XP + Alerta de Jogos Grátis) iniciado!");
+console.log("🛡️ Bot da Taberna dos Templários v7.1 (Com Player Flutuante Nativo de Áudio + Capas HD + Botões Inline) iniciado!");
 console.log("Aguardando novas mensagens e comandos no Telegram...");
 pollUpdates();
