@@ -5,7 +5,7 @@ const path = require('path');
 let TOKEN = process.env.BOT_TOKEN || "";
 let CHAT_ID = process.env.CHAT_ID || "-1004492877879";
 let DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || "";
-let DISCORD_INVITE_LINK = process.env.DISCORD_INVITE_LINK || "https://discord.gg/templarios";
+let DISCORD_INVITE_LINK = process.env.DISCORD_INVITE_LINK || "https://discord.com/channels/690937279882985472/690937280441090122";
 let STEAM_API_KEY = process.env.STEAM_API_KEY || "";
 
 const configPath = path.join(__dirname, 'config.json');
@@ -194,7 +194,7 @@ async function sendDiscordNotification(gameName, organizer) {
       title: "🎮 NOVA JOGATINA CONVOCADA NO TELEGRAM! 🛡️",
       description: `**Jogo:** ${gameName}\n**Organizador:** ${organizer}\n\nEntre no chat do Telegram ou venha para o canal de voz do Discord!`,
       color: 5814783,
-      footer: { text: "Taberna dos Templários Bot v9.0" },
+      footer: { text: "Taberna dos Templários Bot v9.1" },
       timestamp: new Date().toISOString()
     };
 
@@ -210,19 +210,19 @@ async function sendDiscordNotification(gameName, organizer) {
 }
 
 // ----------------------------------------------------
-// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL (v9.0)
+// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL (v9.1)
 // ----------------------------------------------------
-const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v9.0)\n\n` +
+const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v9.1)\n\n` +
   `📌 <b>Esta mensagem fica sempre fixada e atualizada com as novas funções!</b>\n\n` +
   `🌐 <b>Repositório Oficial no GitHub:</b>\n` +
   `🔗 <a href="https://github.com/andliassource/taberna-templarios-bot">https://github.com/andliassource/taberna-templarios-bot</a>\n\n` +
-  `👾 <b>INTEGRAÇÃO DISCORD & STEAM LIVE</b>\n` +
-  `• <code>/discord</code> - Link de convite do servidor do Discord da Taverna\n` +
+  `👾 <b>INTEGRAÇÃO DISCORD DA TAVERNA</b>\n` +
+  `• <code>/discord</code> - Link direto do Servidor/Canal do Discord da Taverna\n` +
   `• <code>/jogando</code> ou <code>/steamstatus</code> - Ver quem dos Templários está online jogando na Steam agora\n` +
   `• <code>/setsteam [nick_ou_id]</code> - Vincula sua conta Steam ao seu perfil do Telegram\n` +
   `• <code>/perfil</code> - Exibe seu Card Gamer Templário com nível, XP e Steam vinculada\n\n` +
   `🎮 <b>JOGATINA TEMPLÁRIA & PROMOÇÕES</b>\n` +
-  `• <code>/jogar [Jogo]</code> - Convocação interativa (Notifica o Telegram e o Discord automaticamente!)\n` +
+  `• <code>/jogar [Jogo]</code> - Convocação interativa com link direto para o Canal de Voz do Discord!\n` +
   `• <code>/steam</code> ou <code>/promo</code> - Jogos pagos 100% gratuitos para PC de hoje\n\n` +
   `🤖 <b>INTELIGÊNCIA ARTIFICIAL & MODO TAVERNEIRO</b>\n` +
   `• <code>/ia [pergunta]</code> ou <code>/pergunta</code> - Pergunta ao Taverneiro Inteligente\n` +
@@ -258,7 +258,7 @@ async function syncPinnedManual() {
         parse_mode: "HTML",
         disable_web_page_preview: true
       });
-      console.log("📌 Mensagem fixada do manual sincronizada com integração Discord/Steam!");
+      console.log("📌 Mensagem fixada do manual sincronizada na v9.1 com o Discord oficial!");
     } catch (e) {
       console.error("Erro ao sincronizar mensagem fixada do manual:", e.message);
     }
@@ -269,9 +269,9 @@ async function syncPinnedManual() {
 // COMANDO DISCORD (/discord)
 // ----------------------------------------------------
 async function handleDiscord(msg) {
-  const text = `👾 <b>SERVIDOR DO DISCORD DA TABERNA DOS TEMPLÁRIOS</b> 🎮\n\n` +
-    `📢 Venha jogar no canal de voz, trocar ideias e acompanhar as jogatinas em tempo real!\n\n` +
-    `🔗 <b>Link de Convite Oficial:</b>\n<a href="${DISCORD_INVITE_LINK}">${DISCORD_INVITE_LINK}</a>`;
+  const text = `👾 <b>CANAL DO DISCORD DA TABERNA DOS TEMPLÁRIOS</b> 🎮\n\n` +
+    `📢 Clique no botão abaixo para entrar na sala de bate-papo e voz no Discord:\n\n` +
+    `🔗 <a href="${DISCORD_INVITE_LINK}">${DISCORD_INVITE_LINK}</a>`;
 
   await apiCall("sendMessage", {
     chat_id: msg.chat.id,
@@ -280,15 +280,13 @@ async function handleDiscord(msg) {
     parse_mode: "HTML",
     reply_markup: {
       inline_keyboard: [
-        [{ text: "👾 Entrar no Servidor do Discord", url: DISCORD_INVITE_LINK }]
+        [{ text: "👾 Abrir Canal no Discord", url: DISCORD_INVITE_LINK }]
       ]
     }
   });
 }
 
-// ----------------------------------------------------
 // STATUS REAL-TIME DA STEAM (/jogando ou /steamstatus)
-// ----------------------------------------------------
 async function handleJogando(msg) {
   const steamEntries = Object.entries(dbData.userSteamIDs);
 
@@ -393,7 +391,7 @@ async function handleJogar(msg, argsText) {
         { text: "❌ Não Posso", callback_data: `game_cant` }
       ],
       [
-        { text: "👾 Canal de Voz do Discord", url: DISCORD_INVITE_LINK }
+        { text: "👾 Canal do Discord da Taverna", url: DISCORD_INVITE_LINK }
       ]
     ]
   };
@@ -417,7 +415,6 @@ async function handleJogar(msg, argsText) {
     };
     saveDB();
 
-    // Notifica também o canal do Discord se houver Webhook cadastrado!
     sendDiscordNotification(gameName, organizer);
   }
 }
@@ -468,7 +465,7 @@ async function handleCallbackQuery(cb) {
         { text: "❌ Não Posso", callback_data: `game_cant` }
       ],
       [
-        { text: "👾 Canal de Voz do Discord", url: DISCORD_INVITE_LINK }
+        { text: "👾 Canal do Discord da Taverna", url: DISCORD_INVITE_LINK }
       ]
     ]
   };
@@ -587,7 +584,7 @@ async function handleAutoTaverneiro(msg) {
       `🍺 Opa, nobre ${user}! Falou em cerveja gelada ou tá precisando da ajuda do Taverneiro?`,
       `⚔️ Por São Jorge, ${user}! O barril tá cheio e a conversa tá boa! O que manda?`,
       `🛡️ Na Taverna dos Templários a regra é clara: respeito aos irmãos e copo sempre cheio!`,
-      `👾 BORA PRO DISCORD! Digite <code>/discord</code> para entrar no canal de voz da Taverna!`
+      `👾 BORA PRO DISCORD! Digite <code>/discord</code> para entrar no canal do Discord da Taverna!`
     ];
     const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
@@ -800,7 +797,7 @@ async function handleNewMembers(msg) {
       `Sinta-se em casa para conversar e participar dos nossos tópicos:\n\n` +
       `💬 <b>Prosa da Taverna:</b> Bate-papo geral\n` +
       `🎮 <b>Jogatina Templária:</b> Use <code>/jogar [Jogo]</code> ou <code>/perfil</code>\n` +
-      `👾 <b>Discord:</b> Use <code>/discord</code> para entrar no nosso canal de voz!\n` +
+      `👾 <b>Discord:</b> Use <code>/discord</code> para entrar no nosso canal do Discord!\n` +
       `🤖 <b>Taverneiro IA:</b> Use <code>/ia [Sua pergunta]</code> ou apenas cite "taverneiro"!\n` +
       `🎤 <b>Áudios Lendários:</b> Use <code>/áudio</code> para memes de áudio virais!\n` +
       `🎬 <b>Cine Templário:</b> Use <code>/filme [Nome]</code> ou <code>/sortearfilme terror</code>\n` +
@@ -1187,7 +1184,7 @@ async function handleFrase(msg) {
 
 // AJUDA COMPLETA
 async function handleAjuda(msg) {
-  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v9.0)</b> 🍺\n\n` +
+  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v9.1)</b> 🍺\n\n` +
     `📌 <i>Consulte o tópico <b>📜 Manual & Comandos</b> para a lista completa com link do GitHub!</i>\n\n` +
     `👾 <b>/discord</b> - Entrar no servidor do Discord da Taverna\n` +
     `🎮 <b>/jogando</b> ou <b>/steamstatus</b> - Ver quem está jogando na Steam agora\n` +
@@ -1317,6 +1314,6 @@ async function pollUpdates() {
   }
 }
 
-console.log("🛡️ Bot da Taberna dos Templários v9.0 (Com Integração Discord Webhook + Steam Status Live) iniciado!");
+console.log("🛡️ Bot da Taberna dos Templários v9.1 (Com Link do Discord Oficial do Usuário) iniciado!");
 console.log("Aguardando novas mensagens e comandos no Telegram...");
 pollUpdates();
