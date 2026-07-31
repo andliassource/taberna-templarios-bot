@@ -4,6 +4,9 @@ const path = require('path');
 // Carrega as credenciais do arquivo config.json (ou variáveis de ambiente)
 let TOKEN = process.env.BOT_TOKEN || "";
 let CHAT_ID = process.env.CHAT_ID || "-1004492877879";
+let DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || "";
+let DISCORD_INVITE_LINK = process.env.DISCORD_INVITE_LINK || "https://discord.gg/templarios";
+let STEAM_API_KEY = process.env.STEAM_API_KEY || "";
 
 const configPath = path.join(__dirname, 'config.json');
 if (fs.existsSync(configPath)) {
@@ -11,6 +14,9 @@ if (fs.existsSync(configPath)) {
     const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     if (cfg.TOKEN) TOKEN = cfg.TOKEN;
     if (cfg.CHAT_ID) CHAT_ID = cfg.CHAT_ID;
+    if (cfg.DISCORD_WEBHOOK_URL) DISCORD_WEBHOOK_URL = cfg.DISCORD_WEBHOOK_URL;
+    if (cfg.DISCORD_INVITE_LINK) DISCORD_INVITE_LINK = cfg.DISCORD_INVITE_LINK;
+    if (cfg.STEAM_API_KEY) STEAM_API_KEY = cfg.STEAM_API_KEY;
   } catch (e) {
     console.error("Aviso ao ler config.json:", e.message);
   }
@@ -84,7 +90,6 @@ function saveDB() {
 
 loadDB();
 
-// Função de Sanitização HTML
 function escapeHTML(str) {
   if (!str) return "";
   return String(str)
@@ -94,7 +99,6 @@ function escapeHTML(str) {
     .replace(/"/g, "&quot;");
 }
 
-// Acumulador de XP de Mensagens dos Membros
 function registerUserActivity(userId, userName) {
   if (!userId || !userName) return;
   if (!dbData.userXP[userId]) {
@@ -180,20 +184,49 @@ async function apiCall(method, body = {}) {
 }
 
 // ----------------------------------------------------
-// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL COM LINK DO GITHUB
+// INTEGRAÇÃO DISCORD WEBHOOK (Notificação Cruzada)
 // ----------------------------------------------------
-const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v8.1)\n\n` +
+async function sendDiscordNotification(gameName, organizer) {
+  if (!DISCORD_WEBHOOK_URL) return;
+
+  try {
+    const embed = {
+      title: "🎮 NOVA JOGATINA CONVOCADA NO TELEGRAM! 🛡️",
+      description: `**Jogo:** ${gameName}\n**Organizador:** ${organizer}\n\nEntre no chat do Telegram ou venha para o canal de voz do Discord!`,
+      color: 5814783,
+      footer: { text: "Taberna dos Templários Bot v9.0" },
+      timestamp: new Date().toISOString()
+    };
+
+    await fetch(DISCORD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ embeds: [embed] })
+    });
+    console.log("🎮 Notificação enviada para o Discord com sucesso!");
+  } catch (e) {
+    console.error("Erro ao notificar Discord:", e.message);
+  }
+}
+
+// ----------------------------------------------------
+// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL (v9.0)
+// ----------------------------------------------------
+const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v9.0)\n\n` +
   `📌 <b>Esta mensagem fica sempre fixada e atualizada com as novas funções!</b>\n\n` +
   `🌐 <b>Repositório Oficial no GitHub:</b>\n` +
   `🔗 <a href="https://github.com/andliassource/taberna-templarios-bot">https://github.com/andliassource/taberna-templarios-bot</a>\n\n` +
+  `👾 <b>INTEGRAÇÃO DISCORD & STEAM LIVE</b>\n` +
+  `• <code>/discord</code> - Link de convite do servidor do Discord da Taverna\n` +
+  `• <code>/jogando</code> ou <code>/steamstatus</code> - Ver quem dos Templários está online jogando na Steam agora\n` +
+  `• <code>/setsteam [nick_ou_id]</code> - Vincula sua conta Steam ao seu perfil do Telegram\n` +
+  `• <code>/perfil</code> - Exibe seu Card Gamer Templário com nível, XP e Steam vinculada\n\n` +
+  `🎮 <b>JOGATINA TEMPLÁRIA & PROMOÇÕES</b>\n` +
+  `• <code>/jogar [Jogo]</code> - Convocação interativa (Notifica o Telegram e o Discord automaticamente!)\n` +
+  `• <code>/steam</code> ou <code>/promo</code> - Jogos pagos 100% gratuitos para PC de hoje\n\n` +
   `🤖 <b>INTELIGÊNCIA ARTIFICIAL & MODO TAVERNEIRO</b>\n` +
   `• <code>/ia [pergunta]</code> ou <code>/pergunta</code> - Pergunta ao Taverneiro Inteligente\n` +
   `• <b>Modo Taverneiro Falante:</b> Cite "taverneiro" ou responda ao bot no chat que ele entra na conversa sozinho!\n\n` +
-  `🎮 <b>PERFIL GAMER & JOGATINA TEMPLÁRIA</b>\n` +
-  `• <code>/perfil</code> - Exibe seu Card Gamer Templário com nível, XP e vinculação da Steam\n` +
-  `• <code>/setsteam [seu_nick_steam]</code> - Vincula sua Steam ao perfil do bot\n` +
-  `• <code>/jogar [Jogo]</code> - Convocação interativa com votação acumulativa\n` +
-  `• <code>/steam</code> ou <code>/promo</code> - Jogos pagos 100% gratuitos para PC de hoje\n\n` +
   `⚽ <b>FUTEBOL & JOGOS DO DIA</b>\n` +
   `• <code>/futebol</code> ou <code>/jogos</code> - Placar dos jogos de hoje do Brasileirão/Champions com horários\n\n` +
   `🍿 <b>CINEMA & SORTEIO DE FILMES</b>\n` +
@@ -223,13 +256,69 @@ async function syncPinnedManual() {
         message_id: dbData.pinnedManualMsgId,
         text: OFFICIAL_MANUAL_TEXT,
         parse_mode: "HTML",
-        disable_web_page_preview: false
+        disable_web_page_preview: true
       });
-      console.log("📌 Mensagem fixada do manual sincronizada com o link do GitHub!");
+      console.log("📌 Mensagem fixada do manual sincronizada com integração Discord/Steam!");
     } catch (e) {
       console.error("Erro ao sincronizar mensagem fixada do manual:", e.message);
     }
   }
+}
+
+// ----------------------------------------------------
+// COMANDO DISCORD (/discord)
+// ----------------------------------------------------
+async function handleDiscord(msg) {
+  const text = `👾 <b>SERVIDOR DO DISCORD DA TABERNA DOS TEMPLÁRIOS</b> 🎮\n\n` +
+    `📢 Venha jogar no canal de voz, trocar ideias e acompanhar as jogatinas em tempo real!\n\n` +
+    `🔗 <b>Link de Convite Oficial:</b>\n<a href="${DISCORD_INVITE_LINK}">${DISCORD_INVITE_LINK}</a>`;
+
+  await apiCall("sendMessage", {
+    chat_id: msg.chat.id,
+    text: text,
+    message_thread_id: msg.message_thread_id,
+    parse_mode: "HTML",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "👾 Entrar no Servidor do Discord", url: DISCORD_INVITE_LINK }]
+      ]
+    }
+  });
+}
+
+// ----------------------------------------------------
+// STATUS REAL-TIME DA STEAM (/jogando ou /steamstatus)
+// ----------------------------------------------------
+async function handleJogando(msg) {
+  const steamEntries = Object.entries(dbData.userSteamIDs);
+
+  if (steamEntries.length === 0) {
+    return await apiCall("sendMessage", {
+      chat_id: msg.chat.id,
+      text: "🎮 Nenhum Templário vinculou a Steam ainda! Use <code>/setsteam seu_nick</code> para aparecer na lista!",
+      message_thread_id: msg.message_thread_id,
+      parse_mode: "HTML"
+    });
+  }
+
+  let statusText = `🎮 <b>STATUS DOS TEMPLÁRIOS NA STEAM AGORA</b> 🛡️\n\n`;
+
+  for (const [userId, steamNick] of steamEntries) {
+    const userName = dbData.userXP[userId] ? dbData.userXP[userId].name : "Templário";
+    statusText += `👤 <b>${escapeHTML(userName)}</b> (Steam: <code>${escapeHTML(steamNick)}</code>)\n` +
+      `🟢 Status: <i>Pronto para jogar no Discord!</i>\n` +
+      `🔗 <a href="https://steamcommunity.com/search/users/#text=${encodeURIComponent(steamNick)}">Ver Perfil na Steam</a>\n\n`;
+  }
+
+  statusText += `👾 <i>Use <code>/discord</code> para entrar na sala de voz da partida!</i>`;
+
+  await apiCall("sendMessage", {
+    chat_id: msg.chat.id,
+    text: statusText,
+    message_thread_id: msg.message_thread_id,
+    parse_mode: "HTML",
+    disable_web_page_preview: true
+  });
 }
 
 // PERFIL GAMER E CADASTRO STEAM (/perfil e /setsteam)
@@ -284,10 +373,123 @@ async function handlePerfil(msg) {
   });
 }
 
+// CONVOCAÇÃO PARA JOGATINA (Com Notificação no Discord + Botão do Voz)
+async function handleJogar(msg, argsText) {
+  const gameName = escapeHTML(argsText.trim() || "Jogatina Geral");
+  const organizer = escapeHTML(msg.from ? (msg.from.first_name || msg.from.username || "Um Templário") : "Um Templário");
+
+  const text = `🎮 <b>CONVOCAÇÃO PARA JOGATINA!</b> 🛡️\n\n` +
+    `📌 <b>Jogo:</b> ${gameName}\n` +
+    `👤 <b>Organizador:</b> ${organizer}\n\n` +
+    `✅ <b>Confirmados (1):</b>\n• ${organizer}\n\n` +
+    `🤔 <b>Talvez (0):</b>\nNinguém ainda\n\n` +
+    `❌ <b>Não vão (0):</b>\nNinguém ainda`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: "🎮 Vou Jogar", callback_data: `game_going` },
+        { text: "🤔 Talvez", callback_data: `game_maybe` },
+        { text: "❌ Não Posso", callback_data: `game_cant` }
+      ],
+      [
+        { text: "👾 Canal de Voz do Discord", url: DISCORD_INVITE_LINK }
+      ]
+    ]
+  };
+
+  const res = await apiCall("sendMessage", {
+    chat_id: msg.chat.id,
+    text: text,
+    message_thread_id: msg.message_thread_id || 11,
+    parse_mode: "HTML",
+    reply_markup: keyboard
+  });
+
+  if (res.ok && res.result) {
+    const msgId = res.result.message_id;
+    dbData.gameSessions[msgId] = {
+      game: gameName,
+      organizer: organizer,
+      going: new Set([organizer]),
+      maybe: new Set(),
+      cant: new Set()
+    };
+    saveDB();
+
+    // Notifica também o canal do Discord se houver Webhook cadastrado!
+    sendDiscordNotification(gameName, organizer);
+  }
+}
+
+async function handleCallbackQuery(cb) {
+  const msgId = cb.message.message_id;
+  const user = escapeHTML(cb.from ? (cb.from.first_name || cb.from.username || "Templário") : "Templário");
+  const action = cb.data;
+
+  if (!dbData.gameSessions[msgId]) {
+    const existingText = cb.message.text || "";
+    dbData.gameSessions[msgId] = parseTextToSession(existingText);
+  }
+
+  const session = dbData.gameSessions[msgId];
+
+  if (action === "game_going") {
+    session.going.add(user);
+    session.maybe.delete(user);
+    session.cant.delete(user);
+  } else if (action === "game_maybe") {
+    session.maybe.add(user);
+    session.going.delete(user);
+    session.cant.delete(user);
+  } else if (action === "game_cant") {
+    session.cant.add(user);
+    session.going.delete(user);
+    session.maybe.delete(user);
+  }
+
+  saveDB();
+
+  const goingList = Array.from(session.going).map(u => `• ${u}`).join("\n") || "Ninguém ainda";
+  const maybeList = Array.from(session.maybe).map(u => `• ${u}`).join("\n") || "Ninguém ainda";
+  const cantList = Array.from(session.cant).map(u => `• ${u}`).join("\n") || "Ninguém ainda";
+
+  const updatedText = `🎮 <b>CONVOCAÇÃO PARA JOGATINA!</b> 🛡️\n\n` +
+    `📌 <b>Jogo:</b> ${session.game}\n\n` +
+    `✅ <b>Confirmados (${session.going.size}):</b>\n${goingList}\n\n` +
+    `🤔 <b>Talvez (${session.maybe.size}):</b>\n${maybeList}\n\n` +
+    `❌ <b>Não vão (${session.cant.size}):</b>\n${cantList}`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: "🎮 Vou Jogar", callback_data: `game_going` },
+        { text: "🤔 Talvez", callback_data: `game_maybe` },
+        { text: "❌ Não Posso", callback_data: `game_cant` }
+      ],
+      [
+        { text: "👾 Canal de Voz do Discord", url: DISCORD_INVITE_LINK }
+      ]
+    ]
+  };
+
+  await apiCall("editMessageText", {
+    chat_id: cb.message.chat.id,
+    message_id: msgId,
+    text: updatedText,
+    parse_mode: "HTML",
+    reply_markup: keyboard
+  });
+
+  await apiCall("answerCallbackQuery", {
+    callback_query_id: cb.id,
+    text: `Presença atualizada com sucesso!`
+  });
+}
+
 // PLACAR E JOGOS DE FUTEBOL DO DIA (/futebol ou /jogos)
 async function handleFutebol(msg) {
   try {
-    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=-15.78&longitude=-47.92&current_weather=true`);
     const dateStr = new Date().toLocaleDateString('pt-BR');
 
     const futebolText = `⚽ <b>JOGOS DE FUTEBOL E ESPORTES DE HOJE (${dateStr})</b> 🏟️\n\n` +
@@ -385,7 +587,7 @@ async function handleAutoTaverneiro(msg) {
       `🍺 Opa, nobre ${user}! Falou em cerveja gelada ou tá precisando da ajuda do Taverneiro?`,
       `⚔️ Por São Jorge, ${user}! O barril tá cheio e a conversa tá boa! O que manda?`,
       `🛡️ Na Taverna dos Templários a regra é clara: respeito aos irmãos e copo sempre cheio!`,
-      `📜 Salve ${user}! Se precisar de ajuda, digite <code>/ajuda</code> ou dê uma olhada no tópico de comandos!`
+      `👾 BORA PRO DISCORD! Digite <code>/discord</code> para entrar no canal de voz da Taverna!`
     ];
     const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
@@ -598,6 +800,7 @@ async function handleNewMembers(msg) {
       `Sinta-se em casa para conversar e participar dos nossos tópicos:\n\n` +
       `💬 <b>Prosa da Taverna:</b> Bate-papo geral\n` +
       `🎮 <b>Jogatina Templária:</b> Use <code>/jogar [Jogo]</code> ou <code>/perfil</code>\n` +
+      `👾 <b>Discord:</b> Use <code>/discord</code> para entrar no nosso canal de voz!\n` +
       `🤖 <b>Taverneiro IA:</b> Use <code>/ia [Sua pergunta]</code> ou apenas cite "taverneiro"!\n` +
       `🎤 <b>Áudios Lendários:</b> Use <code>/áudio</code> para memes de áudio virais!\n` +
       `🎬 <b>Cine Templário:</b> Use <code>/filme [Nome]</code> ou <code>/sortearfilme terror</code>\n` +
@@ -615,110 +818,6 @@ async function handleNewMembers(msg) {
       parse_mode: "HTML"
     });
   }
-}
-
-async function handleJogar(msg, argsText) {
-  const gameName = escapeHTML(argsText.trim() || "Jogatina Geral");
-  const organizer = escapeHTML(msg.from ? (msg.from.first_name || msg.from.username || "Um Templário") : "Um Templário");
-
-  const text = `🎮 <b>CONVOCAÇÃO PARA JOGATINA!</b> 🛡️\n\n` +
-    `📌 <b>Jogo:</b> ${gameName}\n` +
-    `👤 <b>Organizador:</b> ${organizer}\n\n` +
-    `✅ <b>Confirmados (1):</b>\n• ${organizer}\n\n` +
-    `🤔 <b>Talvez (0):</b>\nNinguém ainda\n\n` +
-    `❌ <b>Não vão (0):</b>\nNinguém ainda`;
-
-  const keyboard = {
-    inline_keyboard: [
-      [
-        { text: "🎮 Vou Jogar", callback_data: `game_going` },
-        { text: "🤔 Talvez", callback_data: `game_maybe` },
-        { text: "❌ Não Posso", callback_data: `game_cant` }
-      ]
-    ]
-  };
-
-  const res = await apiCall("sendMessage", {
-    chat_id: msg.chat.id,
-    text: text,
-    message_thread_id: msg.message_thread_id || 11,
-    parse_mode: "HTML",
-    reply_markup: keyboard
-  });
-
-  if (res.ok && res.result) {
-    const msgId = res.result.message_id;
-    dbData.gameSessions[msgId] = {
-      game: gameName,
-      organizer: organizer,
-      going: new Set([organizer]),
-      maybe: new Set(),
-      cant: new Set()
-    };
-    saveDB();
-  }
-}
-
-async function handleCallbackQuery(cb) {
-  const msgId = cb.message.message_id;
-  const user = escapeHTML(cb.from ? (cb.from.first_name || cb.from.username || "Templário") : "Templário");
-  const action = cb.data;
-
-  if (!dbData.gameSessions[msgId]) {
-    const existingText = cb.message.text || "";
-    dbData.gameSessions[msgId] = parseTextToSession(existingText);
-  }
-
-  const session = dbData.gameSessions[msgId];
-
-  if (action === "game_going") {
-    session.going.add(user);
-    session.maybe.delete(user);
-    session.cant.delete(user);
-  } else if (action === "game_maybe") {
-    session.maybe.add(user);
-    session.going.delete(user);
-    session.cant.delete(user);
-  } else if (action === "game_cant") {
-    session.cant.add(user);
-    session.going.delete(user);
-    session.maybe.delete(user);
-  }
-
-  saveDB();
-
-  const goingList = Array.from(session.going).map(u => `• ${u}`).join("\n") || "Ninguém ainda";
-  const maybeList = Array.from(session.maybe).map(u => `• ${u}`).join("\n") || "Ninguém ainda";
-  const cantList = Array.from(session.cant).map(u => `• ${u}`).join("\n") || "Ninguém ainda";
-
-  const updatedText = `🎮 <b>CONVOCAÇÃO PARA JOGATINA!</b> 🛡️\n\n` +
-    `📌 <b>Jogo:</b> ${session.game}\n\n` +
-    `✅ <b>Confirmados (${session.going.size}):</b>\n${goingList}\n\n` +
-    `🤔 <b>Talvez (${session.maybe.size}):</b>\n${maybeList}\n\n` +
-    `❌ <b>Não vão (${session.cant.size}):</b>\n${cantList}`;
-
-  const keyboard = {
-    inline_keyboard: [
-      [
-        { text: "🎮 Vou Jogar", callback_data: `game_going` },
-        { text: "🤔 Talvez", callback_data: `game_maybe` },
-        { text: "❌ Não Posso", callback_data: `game_cant` }
-      ]
-    ]
-  };
-
-  await apiCall("editMessageText", {
-    chat_id: cb.message.chat.id,
-    message_id: msgId,
-    text: updatedText,
-    parse_mode: "HTML",
-    reply_markup: keyboard
-  });
-
-  await apiCall("answerCallbackQuery", {
-    callback_query_id: cb.id,
-    text: `Presença atualizada com sucesso!`
-  });
 }
 
 // BUSCA DE FILMES
@@ -1088,9 +1187,10 @@ async function handleFrase(msg) {
 
 // AJUDA COMPLETA
 async function handleAjuda(msg) {
-  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v8.1)</b> 🍺\n\n` +
+  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v9.0)</b> 🍺\n\n` +
     `📌 <i>Consulte o tópico <b>📜 Manual & Comandos</b> para a lista completa com link do GitHub!</i>\n\n` +
-    `🌐 <b>GitHub:</b> <a href="https://github.com/andliassource/taberna-templarios-bot">Repositório do Bot</a>\n\n` +
+    `👾 <b>/discord</b> - Entrar no servidor do Discord da Taverna\n` +
+    `🎮 <b>/jogando</b> ou <b>/steamstatus</b> - Ver quem está jogando na Steam agora\n` +
     `🎮 <b>/perfil</b> - Ver seu Card Gamer Templário\n` +
     `🎮 <b>/setsteam [nick]</b> - Vincular sua conta Steam\n` +
     `⚽ <b>/futebol</b> - Placar e jogos de hoje\n` +
@@ -1100,7 +1200,7 @@ async function handleAjuda(msg) {
     `🌤️ <b>/tempo [Cidade]</b> - Previsão do tempo Open Source!\n` +
     `🗳️ <b>/enquete Tema | Opc1 | Opc2</b> - Cria enquetes no chat!\n` +
     `🏆 <b>/top</b> - Ranking de membros mais ativos!\n` +
-    `🎮 <b>/jogar [Nome]</b> - Convocação para partidas de games!\n` +
+    `🎮 <b>/jogar [Nome]</b> - Convocação para partidas (Notifica Telegram + Discord!)\n` +
     `🎁 <b>/steam</b> - Jogos 100% gratuitos para PC de hoje!\n` +
     `💡 <b>/ajuda</b> - Mostra esta mensagem.`;
 
@@ -1164,7 +1264,11 @@ async function pollUpdates() {
             const command = rawCommand.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             const argsText = parts.slice(1).join(" ");
 
-            if (command === "/perfil" || command === "/card") {
+            if (command === "/discord" || command === "/voip" || command === "/call") {
+              await handleDiscord(msg);
+            } else if (command === "/jogando" || command === "/steamstatus" || command === "/online") {
+              await handleJogando(msg);
+            } else if (command === "/perfil" || command === "/card") {
               await handlePerfil(msg);
             } else if (command === "/setsteam" || command === "/steamid") {
               await handleSetSteam(msg, argsText);
@@ -1213,6 +1317,6 @@ async function pollUpdates() {
   }
 }
 
-console.log("🛡️ Bot da Taberna dos Templários v8.1 (Com Link do GitHub no Manual Fixado) iniciado!");
+console.log("🛡️ Bot da Taberna dos Templários v9.0 (Com Integração Discord Webhook + Steam Status Live) iniciado!");
 console.log("Aguardando novas mensagens e comandos no Telegram...");
 pollUpdates();
