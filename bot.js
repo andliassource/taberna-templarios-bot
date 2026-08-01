@@ -183,9 +183,7 @@ async function apiCall(method, body = {}) {
   }
 }
 
-// ----------------------------------------------------
 // INTEGRAÇÃO DISCORD WEBHOOK (Notificação Cruzada)
-// ----------------------------------------------------
 async function sendDiscordNotification(gameName, organizer) {
   if (!DISCORD_WEBHOOK_URL) return;
 
@@ -194,7 +192,7 @@ async function sendDiscordNotification(gameName, organizer) {
       title: "🎮 NOVA JOGATINA CONVOCADA NO TELEGRAM! 🛡️",
       description: `**Jogo:** ${gameName}\n**Organizador:** ${organizer}\n\nEntre no chat do Telegram ou venha para o canal de voz do Discord!`,
       color: 5814783,
-      footer: { text: "Taberna dos Templários Bot v9.1" },
+      footer: { text: "Taberna dos Templários Bot v9.2" },
       timestamp: new Date().toISOString()
     };
 
@@ -209,10 +207,8 @@ async function sendDiscordNotification(gameName, organizer) {
   }
 }
 
-// ----------------------------------------------------
-// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL (v9.1)
-// ----------------------------------------------------
-const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v9.1)\n\n` +
+// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL (v9.2)
+const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v9.2)\n\n` +
   `📌 <b>Esta mensagem fica sempre fixada e atualizada com as novas funções!</b>\n\n` +
   `🌐 <b>Repositório Oficial no GitHub:</b>\n` +
   `🔗 <a href="https://github.com/andliassource/taberna-templarios-bot">https://github.com/andliassource/taberna-templarios-bot</a>\n\n` +
@@ -222,7 +218,7 @@ const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b
   `• <code>/setsteam [nick_ou_id]</code> - Vincula sua conta Steam ao seu perfil do Telegram\n` +
   `• <code>/perfil</code> - Exibe seu Card Gamer Templário com nível, XP e Steam vinculada\n\n` +
   `🎮 <b>JOGATINA TEMPLÁRIA & PROMOÇÕES</b>\n` +
-  `• <code>/jogar [Jogo]</code> - Convocação interativa com link direto para o Canal de Voz do Discord!\n` +
+  `• <code>/jogar [Jogo]</code> - Convocação interativa de partidas no tópico atual!\n` +
   `• <code>/steam</code> ou <code>/promo</code> - Jogos pagos 100% gratuitos para PC de hoje\n\n` +
   `🤖 <b>INTELIGÊNCIA ARTIFICIAL & MODO TAVERNEIRO</b>\n` +
   `• <code>/ia [pergunta]</code> ou <code>/pergunta</code> - Pergunta ao Taverneiro Inteligente\n` +
@@ -258,164 +254,69 @@ async function syncPinnedManual() {
         parse_mode: "HTML",
         disable_web_page_preview: true
       });
-      console.log("📌 Mensagem fixada do manual sincronizada na v9.1 com o Discord oficial!");
+      console.log("📌 Mensagem fixada do manual sincronizada na v9.2 com o Discord oficial!");
     } catch (e) {
       console.error("Erro ao sincronizar mensagem fixada do manual:", e.message);
     }
   }
 }
 
-// ----------------------------------------------------
-// COMANDO DISCORD (/discord)
-// ----------------------------------------------------
-async function handleDiscord(msg) {
-  const text = `👾 <b>CANAL DO DISCORD DA TABERNA DOS TEMPLÁRIOS</b> 🎮\n\n` +
-    `📢 Clique no botão abaixo para entrar na sala de bate-papo e voz no Discord:\n\n` +
-    `🔗 <a href="${DISCORD_INVITE_LINK}">${DISCORD_INVITE_LINK}</a>`;
-
-  await apiCall("sendMessage", {
-    chat_id: msg.chat.id,
-    text: text,
-    message_thread_id: msg.message_thread_id,
-    parse_mode: "HTML",
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "👾 Abrir Canal no Discord", url: DISCORD_INVITE_LINK }]
-      ]
-    }
-  });
-}
-
-// STATUS REAL-TIME DA STEAM (/jogando ou /steamstatus)
-async function handleJogando(msg) {
-  const steamEntries = Object.entries(dbData.userSteamIDs);
-
-  if (steamEntries.length === 0) {
-    return await apiCall("sendMessage", {
-      chat_id: msg.chat.id,
-      text: "🎮 Nenhum Templário vinculou a Steam ainda! Use <code>/setsteam seu_nick</code> para aparecer na lista!",
-      message_thread_id: msg.message_thread_id,
-      parse_mode: "HTML"
-    });
-  }
-
-  let statusText = `🎮 <b>STATUS DOS TEMPLÁRIOS NA STEAM AGORA</b> 🛡️\n\n`;
-
-  for (const [userId, steamNick] of steamEntries) {
-    const userName = dbData.userXP[userId] ? dbData.userXP[userId].name : "Templário";
-    statusText += `👤 <b>${escapeHTML(userName)}</b> (Steam: <code>${escapeHTML(steamNick)}</code>)\n` +
-      `🟢 Status: <i>Pronto para jogar no Discord!</i>\n` +
-      `🔗 <a href="https://steamcommunity.com/search/users/#text=${encodeURIComponent(steamNick)}">Ver Perfil na Steam</a>\n\n`;
-  }
-
-  statusText += `👾 <i>Use <code>/discord</code> para entrar na sala de voz da partida!</i>`;
-
-  await apiCall("sendMessage", {
-    chat_id: msg.chat.id,
-    text: statusText,
-    message_thread_id: msg.message_thread_id,
-    parse_mode: "HTML",
-    disable_web_page_preview: true
-  });
-}
-
-// PERFIL GAMER E CADASTRO STEAM (/perfil e /setsteam)
-async function handleSetSteam(msg, argsText) {
-  const userId = msg.from ? msg.from.id : null;
-  const steamNick = argsText.trim();
-
-  if (!userId || !steamNick) {
-    return await apiCall("sendMessage", {
-      chat_id: msg.chat.id,
-      text: "🎮 <b>Como vincular sua Steam:</b>\n<code>/setsteam seu_nickname_da_steam</code>",
-      message_thread_id: msg.message_thread_id,
-      parse_mode: "HTML"
-    });
-  }
-
-  dbData.userSteamIDs[userId] = steamNick;
-  saveDB();
-
-  await apiCall("sendMessage", {
-    chat_id: msg.chat.id,
-    text: `🎮 <b>Steam vinculada com sucesso!</b>\nNick da Steam: <code>${escapeHTML(steamNick)}</code>\n\nAgora digite <code>/perfil</code> para ver seu Card Gamer Templário!`,
-    message_thread_id: msg.message_thread_id,
-    parse_mode: "HTML"
-  });
-}
-
-async function handlePerfil(msg) {
-  const userId = msg.from ? msg.from.id : null;
-  const userName = escapeHTML(msg.from ? (msg.from.first_name || msg.from.username || "Templário") : "Templário");
-
-  const userStats = dbData.userXP[userId] || { count: 1 };
-  const steamNick = dbData.userSteamIDs[userId] || "Não vinculada (Use /setsteam)";
-
-  let rankTitle = "Escudeiro";
-  if (userStats.count >= 50) rankTitle = "Grão-Mestre da Taverna 🥇";
-  else if (userStats.count >= 20) rankTitle = "Cavaleiro Templário 🥈";
-  else if (userStats.count >= 5) rankTitle = "Guardião da Taverna 🥉";
-
-  const cardText = `🛡️ <b>CARD GAMER TEMPLÁRIO</b> 🍺\n\n` +
-    `👤 <b>Membro:</b> ${userName}\n` +
-    `🏆 <b>Patente:</b> ${rankTitle}\n` +
-    `💬 <b>Engajamento:</b> ${userStats.count} mensagens enviadas\n` +
-    `🎮 <b>Steam Vinculada:</b> <code>${escapeHTML(steamNick)}</code>\n\n` +
-    `🔥 <i>"Honra, lealdade e boas partidas na Taverna!"</i>`;
-
-  await apiCall("sendMessage", {
-    chat_id: msg.chat.id,
-    text: cardText,
-    message_thread_id: msg.message_thread_id,
-    parse_mode: "HTML"
-  });
-}
-
-// CONVOCAÇÃO PARA JOGATINA (Com Notificação no Discord + Botão do Voz)
+// CONVOCAÇÃO PARA JOGATINA (v9.2 Corrigido)
 async function handleJogar(msg, argsText) {
-  const gameName = escapeHTML(argsText.trim() || "Jogatina Geral");
-  const organizer = escapeHTML(msg.from ? (msg.from.first_name || msg.from.username || "Um Templário") : "Um Templário");
+  try {
+    const gameName = escapeHTML(argsText.trim() || "Jogatina Geral");
+    const organizer = escapeHTML(msg.from ? (msg.from.first_name || msg.from.username || "Um Templário") : "Um Templário");
 
-  const text = `🎮 <b>CONVOCAÇÃO PARA JOGATINA!</b> 🛡️\n\n` +
-    `📌 <b>Jogo:</b> ${gameName}\n` +
-    `👤 <b>Organizador:</b> ${organizer}\n\n` +
-    `✅ <b>Confirmados (1):</b>\n• ${organizer}\n\n` +
-    `🤔 <b>Talvez (0):</b>\nNinguém ainda\n\n` +
-    `❌ <b>Não vão (0):</b>\nNinguém ainda`;
+    const text = `🎮 <b>CONVOCAÇÃO PARA JOGATINA!</b> 🛡️\n\n` +
+      `📌 <b>Jogo:</b> ${gameName}\n` +
+      `👤 <b>Organizador:</b> ${organizer}\n\n` +
+      `✅ <b>Confirmados (1):</b>\n• ${organizer}\n\n` +
+      `🤔 <b>Talvez (0):</b>\nNinguém ainda\n\n` +
+      `❌ <b>Não vão (0):</b>\nNinguém ainda`;
 
-  const keyboard = {
-    inline_keyboard: [
-      [
-        { text: "🎮 Vou Jogar", callback_data: `game_going` },
-        { text: "🤔 Talvez", callback_data: `game_maybe` },
-        { text: "❌ Não Posso", callback_data: `game_cant` }
-      ],
-      [
-        { text: "👾 Canal do Discord da Taverna", url: DISCORD_INVITE_LINK }
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🎮 Vou Jogar", callback_data: `game_going` },
+          { text: "🤔 Talvez", callback_data: `game_maybe` },
+          { text: "❌ Não Posso", callback_data: `game_cant` }
+        ],
+        [
+          { text: "👾 Canal do Discord da Taverna", url: DISCORD_INVITE_LINK }
+        ]
       ]
-    ]
-  };
-
-  const res = await apiCall("sendMessage", {
-    chat_id: msg.chat.id,
-    text: text,
-    message_thread_id: msg.message_thread_id || 11,
-    parse_mode: "HTML",
-    reply_markup: keyboard
-  });
-
-  if (res.ok && res.result) {
-    const msgId = res.result.message_id;
-    dbData.gameSessions[msgId] = {
-      game: gameName,
-      organizer: organizer,
-      going: new Set([organizer]),
-      maybe: new Set(),
-      cant: new Set()
     };
-    saveDB();
 
-    sendDiscordNotification(gameName, organizer);
+    const payload = {
+      chat_id: msg.chat.id,
+      text: text,
+      parse_mode: "HTML",
+      reply_markup: keyboard
+    };
+
+    if (msg.message_thread_id) {
+      payload.message_thread_id = msg.message_thread_id;
+    }
+
+    const res = await apiCall("sendMessage", payload);
+
+    if (res.ok && res.result) {
+      const msgId = res.result.message_id;
+      dbData.gameSessions[msgId] = {
+        game: gameName,
+        organizer: organizer,
+        going: new Set([organizer]),
+        maybe: new Set(),
+        cant: new Set()
+      };
+      saveDB();
+
+      sendDiscordNotification(gameName, organizer);
+    } else {
+      console.error("[JOGAR ERROR]:", res);
+    }
+  } catch (err) {
+    console.error("[JOGAR EXCEPTION]:", err.message);
   }
 }
 
@@ -484,6 +385,118 @@ async function handleCallbackQuery(cb) {
   });
 }
 
+// COMANDO DISCORD (/discord)
+async function handleDiscord(msg) {
+  const text = `👾 <b>CANAL DO DISCORD DA TABERNA DOS TEMPLÁRIOS</b> 🎮\n\n` +
+    `📢 Clique no botão abaixo para entrar na sala de bate-papo e voz no Discord:\n\n` +
+    `🔗 <a href="${DISCORD_INVITE_LINK}">${DISCORD_INVITE_LINK}</a>`;
+
+  const payload = {
+    chat_id: msg.chat.id,
+    text: text,
+    parse_mode: "HTML",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "👾 Abrir Canal no Discord", url: DISCORD_INVITE_LINK }]
+      ]
+    }
+  };
+
+  if (msg.message_thread_id) {
+    payload.message_thread_id = msg.message_thread_id;
+  }
+
+  await apiCall("sendMessage", payload);
+}
+
+// STATUS REAL-TIME DA STEAM (/jogando ou /steamstatus)
+async function handleJogando(msg) {
+  const steamEntries = Object.entries(dbData.userSteamIDs);
+
+  if (steamEntries.length === 0) {
+    const payload = {
+      chat_id: msg.chat.id,
+      text: "🎮 Nenhum Templário vinculou a Steam ainda! Use <code>/setsteam seu_nick</code> para aparecer na lista!",
+      parse_mode: "HTML"
+    };
+    if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+    return await apiCall("sendMessage", payload);
+  }
+
+  let statusText = `🎮 <b>STATUS DOS TEMPLÁRIOS NA STEAM AGORA</b> 🛡️\n\n`;
+
+  for (const [userId, steamNick] of steamEntries) {
+    const userName = dbData.userXP[userId] ? dbData.userXP[userId].name : "Templário";
+    statusText += `👤 <b>${escapeHTML(userName)}</b> (Steam: <code>${escapeHTML(steamNick)}</code>)\n` +
+      `🟢 Status: <i>Pronto para jogar no Discord!</i>\n` +
+      `🔗 <a href="https://steamcommunity.com/search/users/#text=${encodeURIComponent(steamNick)}">Ver Perfil na Steam</a>\n\n`;
+  }
+
+  statusText += `👾 <i>Use <code>/discord</code> para entrar na sala de voz da partida!</i>`;
+
+  const payload = {
+    chat_id: msg.chat.id,
+    text: statusText,
+    parse_mode: "HTML",
+    disable_web_page_preview: true
+  };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
+  await apiCall("sendMessage", payload);
+}
+
+// PERFIL GAMER E CADASTRO STEAM (/perfil e /setsteam)
+async function handleSetSteam(msg, argsText) {
+  const userId = msg.from ? msg.from.id : null;
+  const steamNick = argsText.trim();
+
+  const payload = {
+    chat_id: msg.chat.id,
+    parse_mode: "HTML"
+  };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
+  if (!userId || !steamNick) {
+    payload.text = "🎮 <b>Como vincular sua Steam:</b>\n<code>/setsteam seu_nickname_da_steam</code>";
+    return await apiCall("sendMessage", payload);
+  }
+
+  dbData.userSteamIDs[userId] = steamNick;
+  saveDB();
+
+  payload.text = `🎮 <b>Steam vinculada com sucesso!</b>\nNick da Steam: <code>${escapeHTML(steamNick)}</code>\n\nAgora digite <code>/perfil</code> para ver seu Card Gamer Templário!`;
+  await apiCall("sendMessage", payload);
+}
+
+async function handlePerfil(msg) {
+  const userId = msg.from ? msg.from.id : null;
+  const userName = escapeHTML(msg.from ? (msg.from.first_name || msg.from.username || "Templário") : "Templário");
+
+  const userStats = dbData.userXP[userId] || { count: 1 };
+  const steamNick = dbData.userSteamIDs[userId] || "Não vinculada (Use /setsteam)";
+
+  let rankTitle = "Escudeiro";
+  if (userStats.count >= 50) rankTitle = "Grão-Mestre da Taverna 🥇";
+  else if (userStats.count >= 20) rankTitle = "Cavaleiro Templário 🥈";
+  else if (userStats.count >= 5) rankTitle = "Guardião da Taverna 🥉";
+
+  const cardText = `🛡️ <b>CARD GAMER TEMPLÁRIO</b> 🍺\n\n` +
+    `👤 <b>Membro:</b> ${userName}\n` +
+    `🏆 <b>Patente:</b> ${rankTitle}\n` +
+    `💬 <b>Engajamento:</b> ${userStats.count} mensagens enviadas\n` +
+    `🎮 <b>Steam Vinculada:</b> <code>${escapeHTML(steamNick)}</code>\n\n` +
+    `🔥 <i>"Honra, lealdade e boas partidas na Taverna!"</i>`;
+
+  const payload = {
+    chat_id: msg.chat.id,
+    text: cardText,
+    parse_mode: "HTML"
+  };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
+  await apiCall("sendMessage", payload);
+}
+
 // PLACAR E JOGOS DE FUTEBOL DO DIA (/futebol ou /jogos)
 async function handleFutebol(msg) {
   try {
@@ -498,12 +511,14 @@ async function handleFutebol(msg) {
       `• 17:00 - Real Madrid x Manchester City 📺 <i>TNT / Max</i>\n\n` +
       `🍺 <i>Chame a galera no tópico de jogatina para acompanhar com hidromel gelado!</i>`;
 
-    await apiCall("sendMessage", {
+    const payload = {
       chat_id: msg.chat.id,
       text: futebolText,
-      message_thread_id: msg.message_thread_id,
       parse_mode: "HTML"
-    });
+    };
+    if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
+    await apiCall("sendMessage", payload);
   } catch (err) {
     await apiCall("sendMessage", {
       chat_id: msg.chat.id,
@@ -520,13 +535,12 @@ async function handleSortearFilme(msg, genreQuery) {
     const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(genre)}&entity=movie&limit=15`);
     const data = await res.json();
 
+    const payload = { chat_id: msg.chat.id, parse_mode: "HTML" };
+    if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
     if (!data.results || data.results.length === 0) {
-      return await apiCall("sendMessage", {
-        chat_id: msg.chat.id,
-        text: `🍿 Nenhum filme encontrado para o gênero "${genre}". Tente ex: <code>/sortearfilme terror</code> ou <code>/sortearfilme acao</code>`,
-        message_thread_id: msg.message_thread_id,
-        parse_mode: "HTML"
-      });
+      payload.text = `🍿 Nenhum filme encontrado para o gênero "${genre}". Tente ex: <code>/sortearfilme terror</code> ou <code>/sortearfilme acao</code>`;
+      return await apiCall("sendMessage", payload);
     }
 
     const movie = data.results[Math.floor(Math.random() * data.results.length)];
@@ -547,21 +561,15 @@ async function handleSortearFilme(msg, genreQuery) {
       `🎥 <a href="${youtubeLink}">Buscar Grátis no YouTube</a>\n` +
       `📺 <a href="${plutoLink}">Ver no Pluto TV</a>`;
 
+    payload.text = text;
+
     if (artwork) {
-      await apiCall("sendPhoto", {
-        chat_id: msg.chat.id,
-        photo: artwork,
-        caption: text,
-        message_thread_id: msg.message_thread_id || 12,
-        parse_mode: "HTML"
-      });
+      payload.photo = artwork;
+      payload.caption = text;
+      delete payload.text;
+      await apiCall("sendPhoto", payload);
     } else {
-      await apiCall("sendMessage", {
-        chat_id: msg.chat.id,
-        text: text,
-        message_thread_id: msg.message_thread_id || 12,
-        parse_mode: "HTML"
-      });
+      await apiCall("sendMessage", payload);
     }
   } catch (err) {
     await apiCall("sendMessage", {
@@ -588,25 +596,26 @@ async function handleAutoTaverneiro(msg) {
     ];
     const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
-    await apiCall("sendMessage", {
+    const payload = {
       chat_id: msg.chat.id,
       text: randomQuote,
-      message_thread_id: msg.message_thread_id,
       parse_mode: "HTML"
-    });
+    };
+    if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
+    await apiCall("sendMessage", payload);
   }
 }
 
 // IA DO TAVERNEIRO (/ia [pergunta])
 async function handleIA(msg, prompt) {
   const userQuery = prompt.trim();
+  const payload = { chat_id: msg.chat.id, parse_mode: "HTML" };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
   if (!userQuery) {
-    return await apiCall("sendMessage", {
-      chat_id: msg.chat.id,
-      text: "🍺 <b>Pergunte algo ao Taverneiro!</b>\nExemplo: <code>/ia qual o melhor jogo de RPG?</code>",
-      message_thread_id: msg.message_thread_id,
-      parse_mode: "HTML"
-    });
+    payload.text = "🍺 <b>Pergunte algo ao Taverneiro!</b>\nExemplo: <code>/ia qual o melhor jogo de RPG?</code>";
+    return await apiCall("sendMessage", payload);
   }
 
   const user = msg.from ? msg.from.first_name : "Templário";
@@ -625,15 +634,10 @@ async function handleIA(msg, prompt) {
       answer = `Pelas barbas dos Templários, nobre ${user}! Essa é uma excelente questão sobre "${userQuery}". Como taverneiro, digo-lhe que o segredo é manter a cerveja gelada e a espada afiada!`;
     }
 
-    const responseText = `🍺 <b>O TAVERNEIRO RESPONDE PARA ${user.toUpperCase()}:</b>\n\n` +
+    payload.text = `🍺 <b>O TAVERNEIRO RESPONDE PARA ${user.toUpperCase()}:</b>\n\n` +
       `📜 <i>"${escapeHTML(answer)}"\n\n— Palavras do Taverneiro da Taverna dos Templários 🛡️</i>`;
 
-    await apiCall("sendMessage", {
-      chat_id: msg.chat.id,
-      text: responseText,
-      message_thread_id: msg.message_thread_id,
-      parse_mode: "HTML"
-    });
+    await apiCall("sendMessage", payload);
   } catch (err) {
     await apiCall("sendMessage", {
       chat_id: msg.chat.id,
@@ -646,17 +650,16 @@ async function handleIA(msg, prompt) {
 // CLIMA OPEN SOURCE COM OPEN-METEO (/tempo [Cidade])
 async function handleTempo(msg, cityQuery) {
   const city = cityQuery.trim() || "Goiânia";
+  const payload = { chat_id: msg.chat.id, parse_mode: "HTML" };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
   try {
     const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=pt`);
     const geoData = await geoRes.json();
 
     if (!geoData.results || geoData.results.length === 0) {
-      return await apiCall("sendMessage", {
-        chat_id: msg.chat.id,
-        text: `🌤️ Cidade "${city}" não encontrada. Tente ex: <code>/tempo Goiânia</code> ou <code>/tempo São Paulo</code>`,
-        message_thread_id: msg.message_thread_id,
-        parse_mode: "HTML"
-      });
+      payload.text = `🌤️ Cidade "${city}" não encontrada. Tente ex: <code>/tempo Goiânia</code> ou <code>/tempo São Paulo</code>`;
+      return await apiCall("sendMessage", payload);
     }
 
     const loc = geoData.results[0];
@@ -674,18 +677,13 @@ async function handleTempo(msg, cityQuery) {
     else if (code >= 51 && code <= 67) weatherEmoji = "🌧️ Chuva Leve / Moderada";
     else if (code >= 80) weatherEmoji = "🌩️ Tempestade / Chuva Forte";
 
-    const text = `🌤️ <b>PREVISÃO DO TEMPO NA TAVERNA</b> 🛡️\n\n` +
+    payload.text = `🌤️ <b>PREVISÃO DO TEMPO NA TAVERNA</b> 🛡️\n\n` +
       `📍 <b>Local:</b> ${loc.name}, ${loc.country}\n` +
       `🌡️ <b>Temperatura:</b> ${temp}°C (${weatherEmoji})\n` +
       `💨 <b>Vento:</b> ${wind} km/h\n\n` +
       `🍺 <i>Clima perfeito para um copo de hidromel na Taverna!</i>`;
 
-    await apiCall("sendMessage", {
-      chat_id: msg.chat.id,
-      text: text,
-      message_thread_id: msg.message_thread_id,
-      parse_mode: "HTML"
-    });
+    await apiCall("sendMessage", payload);
   } catch (err) {
     await apiCall("sendMessage", {
       chat_id: msg.chat.id,
@@ -701,34 +699,31 @@ async function handleEnquete(msg, argsText) {
   const question = parts[0];
   const options = parts.slice(1);
 
+  const payload = { chat_id: msg.chat.id };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
   if (!question || options.length < 2) {
-    return await apiCall("sendMessage", {
-      chat_id: msg.chat.id,
-      text: "🗳️ <b>Como criar uma enquete:</b>\n<code>/enquete Qual o melhor jogo? | Counter Strike | Valorant | FIFA</code>",
-      message_thread_id: msg.message_thread_id,
-      parse_mode: "HTML"
-    });
+    payload.text = "🗳️ <b>Como criar uma enquete:</b>\n<code>/enquete Qual o melhor jogo? | Counter Strike | Valorant | FIFA</code>";
+    payload.parse_mode = "HTML";
+    return await apiCall("sendMessage", payload);
   }
 
-  await apiCall("sendPoll", {
-    chat_id: msg.chat.id,
-    question: `📊 ${question}`,
-    options: options.slice(0, 10),
-    is_anonymous: false,
-    message_thread_id: msg.message_thread_id
-  });
+  payload.question = `📊 ${question}`;
+  payload.options = options.slice(0, 10);
+  payload.is_anonymous = false;
+
+  await apiCall("sendPoll", payload);
 }
 
 // RANKING E XP DOS MEMBROS (/top ou /ranking)
 async function handleRanking(msg) {
   const users = Object.values(dbData.userXP).sort((a, b) => b.count - a.count);
+  const payload = { chat_id: msg.chat.id };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
 
   if (users.length === 0) {
-    return await apiCall("sendMessage", {
-      chat_id: msg.chat.id,
-      text: "🏆 Ninguém pontuou na Taverna ainda! Enviem mensagens para subir de nível!",
-      message_thread_id: msg.message_thread_id
-    });
+    payload.text = "🏆 Ninguém pontuou na Taverna ainda! Enviem mensagens para subir de nível!";
+    return await apiCall("sendMessage", payload);
   }
 
   let rankingText = `🏆 <b>RANKING DE ENGAJAMENTO DA TAVERNA</b> 🛡️🍺\n\n`;
@@ -746,12 +741,10 @@ async function handleRanking(msg) {
 
   rankingText += `\n<i>Continue conversando nos tópicos para subir na hierarquia dos Templários!</i>`;
 
-  await apiCall("sendMessage", {
-    chat_id: msg.chat.id,
-    text: rankingText,
-    message_thread_id: msg.message_thread_id,
-    parse_mode: "HTML"
-  });
+  payload.text = rankingText;
+  payload.parse_mode = "HTML";
+
+  await apiCall("sendMessage", payload);
 }
 
 // NOTIFICAÇÃO AUTOMÁTICA EM SEGUNDO PLANO DE JOGOS GRÁTIS
@@ -808,25 +801,26 @@ async function handleNewMembers(msg) {
       `🏆 <b>Ranking:</b> Use <code>/top</code> para ver os membros mais ativos!\n` +
       `🎁 <b>Promoções:</b> Use <code>/steam</code> para jogos grátis de PC.`;
 
-    await apiCall("sendMessage", {
+    const payload = {
       chat_id: msg.chat.id,
       text: welcomeText,
-      message_thread_id: msg.message_thread_id,
       parse_mode: "HTML"
-    });
+    };
+    if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
+    await apiCall("sendMessage", payload);
   }
 }
 
 // BUSCA DE FILMES
 async function handleFilme(msg, query) {
   const searchTerm = query.trim();
+  const payload = { chat_id: msg.chat.id, parse_mode: "HTML" };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
   if (!searchTerm) {
-    return await apiCall("sendMessage", {
-      chat_id: msg.chat.id,
-      text: "🎬 Digite o nome do filme ou série.\nExemplo: <code>/filme Matrix</code>",
-      message_thread_id: msg.message_thread_id,
-      parse_mode: "HTML"
-    });
+    payload.text = "🎬 Digite o nome do filme ou série.\nExemplo: <code>/filme Matrix</code>";
+    return await apiCall("sendMessage", payload);
   }
 
   try {
@@ -861,21 +855,15 @@ async function handleFilme(msg, query) {
       `📺 <a href="${plutoLink}">Assistir Grátis no Pluto TV</a>\n` +
       `🏛️ <a href="${archiveLink}">Ver no Internet Archive (Filmes Clássicos Grátis)</a>`;
 
+    payload.text = text;
+
     if (artwork) {
-      return await apiCall("sendPhoto", {
-        chat_id: msg.chat.id,
-        photo: artwork,
-        caption: text,
-        message_thread_id: msg.message_thread_id || 12,
-        parse_mode: "HTML"
-      });
+      payload.photo = artwork;
+      payload.caption = text;
+      delete payload.text;
+      return await apiCall("sendPhoto", payload);
     } else {
-      return await apiCall("sendMessage", {
-        chat_id: msg.chat.id,
-        text: text,
-        message_thread_id: msg.message_thread_id || 12,
-        parse_mode: "HTML"
-      });
+      return await apiCall("sendMessage", payload);
     }
   } catch (err) {
     await apiCall("sendMessage", {
@@ -889,13 +877,12 @@ async function handleFilme(msg, query) {
 // BUSCA DE MÚSICAS COM PLAYER NATIVO DO TELEGRAM OTIMIZADO
 async function handleMusica(msg, query) {
   const searchTerm = query.trim();
+  const payload = { chat_id: msg.chat.id, parse_mode: "HTML" };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
   if (!searchTerm) {
-    return await apiCall("sendMessage", {
-      chat_id: msg.chat.id,
-      text: "🎵 Digite o nome da música ou artista.\nExemplo: <code>/música Queen Bohemian Rhapsody</code> ou <code>/deezer Metallica</code>",
-      message_thread_id: msg.message_thread_id,
-      parse_mode: "HTML"
-    });
+    payload.text = "🎵 Digite o nome da música ou artista.\nExemplo: <code>/música Queen Bohemian Rhapsody</code> ou <code>/deezer Metallica</code>";
+    return await apiCall("sendMessage", payload);
   }
 
   try {
@@ -916,25 +903,21 @@ async function handleMusica(msg, query) {
       const spotifyUrl = `https://open.spotify.com/search/${queryEscaped}`;
 
       if (previewUrl) {
-        await apiCall("sendAudio", {
-          chat_id: msg.chat.id,
-          audio: previewUrl,
-          title: songTitle,
-          performer: artist,
-          thumbnail: cover,
-          caption: `🎵 <b>${escapeHTML(songTitle)}</b>\n👤 <b>Artista:</b> ${escapeHTML(artist)}\n💿 <b>Álbum:</b> ${escapeHTML(album)}`,
-          message_thread_id: msg.message_thread_id || 13,
-          parse_mode: "HTML",
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: "💜 Ouvir no Deezer", url: deezerLink },
-                { text: "▶️ YouTube Music", url: youtubeMusicLink },
-                { text: "🟢 Spotify", url: spotifyUrl }
-              ]
+        payload.audio = previewUrl;
+        payload.title = songTitle;
+        payload.performer = artist;
+        payload.thumbnail = cover;
+        payload.caption = `🎵 <b>${escapeHTML(songTitle)}</b>\n👤 <b>Artista:</b> ${escapeHTML(artist)}\n💿 <b>Álbum:</b> ${escapeHTML(album)}`;
+        payload.reply_markup = {
+          inline_keyboard: [
+            [
+              { text: "💜 Ouvir no Deezer", url: deezerLink },
+              { text: "▶️ YouTube Music", url: youtubeMusicLink },
+              { text: "🟢 Spotify", url: spotifyUrl }
             ]
-          }
-        });
+          ]
+        };
+        await apiCall("sendAudio", payload);
       } else {
         const text = `🎵 <b>${escapeHTML(songTitle)}</b>\n` +
           `👤 <b>Artista:</b> ${escapeHTML(artist)}\n` +
@@ -944,24 +927,22 @@ async function handleMusica(msg, query) {
           `▶️ <a href="${youtubeMusicLink}">Ouvir no YouTube Music</a>\n` +
           `🟢 <a href="${spotifyUrl}">Ouvir no Spotify</a>`;
 
+        payload.text = text;
+
         if (cover) {
-          await apiCall("sendPhoto", {
-            chat_id: msg.chat.id,
-            photo: cover,
-            caption: text,
-            message_thread_id: msg.message_thread_id || 13,
-            parse_mode: "HTML"
-          });
+          payload.photo = cover;
+          payload.caption = text;
+          delete payload.text;
+          await apiCall("sendPhoto", payload);
+        } else {
+          await apiCall("sendMessage", payload);
         }
       }
       return;
     }
 
-    await apiCall("sendMessage", {
-      chat_id: msg.chat.id,
-      text: `🎵 Nenhuma música encontrada para "${searchTerm}".`,
-      message_thread_id: msg.message_thread_id
-    });
+    payload.text = `🎵 Nenhuma música encontrada para "${searchTerm}".`;
+    await apiCall("sendMessage", payload);
   } catch (err) {
     await apiCall("sendMessage", {
       chat_id: msg.chat.id,
@@ -987,12 +968,14 @@ async function handleDolar(msg) {
       `₿ <b>Bitcoin (BTC):</b> R$ ${parseFloat(btc.bid).toLocaleString('pt-BR')} (${btc.pctChange}%)\n\n` +
       `🕒 <i>Atualizado em: ${new Date().toLocaleTimeString('pt-BR')}</i>`;
 
-    await apiCall("sendMessage", {
+    const payload = {
       chat_id: msg.chat.id,
       text: text,
-      message_thread_id: msg.message_thread_id,
       parse_mode: "HTML"
-    });
+    };
+    if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
+    await apiCall("sendMessage", payload);
   } catch (err) {
     await apiCall("sendMessage", {
       chat_id: msg.chat.id,
@@ -1009,27 +992,28 @@ async function handleAudio(msg) {
 
   const caption = `🎤 <b>MEME DE ÁUDIO VIRAL DA INTERNET!</b>\n\n👤 <b>Invocado por:</b> ${user}\n🔊 <b>Áudio:</b> ${escapeHTML(selected.title)}`;
 
-  await apiCall("sendAudio", {
+  const payload = {
     chat_id: msg.chat.id,
     audio: selected.url,
     title: selected.title,
     performer: "Memes da Internet",
     caption: caption,
-    message_thread_id: msg.message_thread_id || 15,
     parse_mode: "HTML"
-  });
+  };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
+  await apiCall("sendAudio", payload);
 }
 
 // BUSCA DE LIVROS
 async function handleLivro(msg, query) {
   const searchTerm = query.trim();
+  const payload = { chat_id: msg.chat.id, parse_mode: "HTML" };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
   if (!searchTerm) {
-    return await apiCall("sendMessage", {
-      chat_id: msg.chat.id,
-      text: "📚 Digite o nome do livro.\nExemplo: <code>/livro O Príncipe</code> ou <code>/livro Mochileiro das Galáxias</code>",
-      message_thread_id: msg.message_thread_id,
-      parse_mode: "HTML"
-    });
+    payload.text = "📚 Digite o nome do livro.\nExemplo: <code>/livro O Príncipe</code> ou <code>/livro Mochileiro das Galáxias</code>";
+    return await apiCall("sendMessage", payload);
   }
 
   try {
@@ -1062,21 +1046,15 @@ async function handleLivro(msg, query) {
       `📄 <a href="${gutenbergLink}">Baixar EPUB/PDF Grátis no Project Gutenberg</a>\n` +
       `🔍 <a href="${pdfSearchLink}">Buscar Download Direto de PDF no Google</a>`;
 
+    payload.text = text;
+
     if (artwork) {
-      return await apiCall("sendPhoto", {
-        chat_id: msg.chat.id,
-        photo: artwork,
-        caption: text,
-        message_thread_id: msg.message_thread_id || 14,
-        parse_mode: "HTML"
-      });
+      payload.photo = artwork;
+      payload.caption = text;
+      delete payload.text;
+      return await apiCall("sendPhoto", payload);
     } else {
-      return await apiCall("sendMessage", {
-        chat_id: msg.chat.id,
-        text: text,
-        message_thread_id: msg.message_thread_id || 14,
-        parse_mode: "HTML"
-      });
+      return await apiCall("sendMessage", payload);
     }
   } catch (err) {
     await apiCall("sendMessage", {
@@ -1110,13 +1088,15 @@ async function handleSteam(msg) {
         `🔗 <a href="${d.open_giveaway_url}">Resgatar Jogo Grátis</a>\n\n`;
     }
 
-    await apiCall("sendMessage", {
+    const payload = {
       chat_id: msg.chat.id,
       text: text,
-      message_thread_id: msg.message_thread_id || 11,
       parse_mode: "HTML",
       disable_web_page_preview: true
-    });
+    };
+    if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
+    await apiCall("sendMessage", payload);
   } catch (err) {
     await apiCall("sendMessage", {
       chat_id: msg.chat.id,
@@ -1131,13 +1111,12 @@ async function handleDado(msg, argsText) {
   const query = argsText.trim().toLowerCase() || "1d20";
   const match = query.match(/^(\d+)?d(\d+)$/);
 
+  const payload = { chat_id: msg.chat.id, parse_mode: "HTML" };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
   if (!match) {
-    return await apiCall("sendMessage", {
-      chat_id: msg.chat.id,
-      text: "🎲 Exemplo de uso: <code>/dado 1d20</code> ou <code>/dado 2d6</code>",
-      message_thread_id: msg.message_thread_id,
-      parse_mode: "HTML"
-    });
+    payload.text = "🎲 Exemplo de uso: <code>/dado 1d20</code> ou <code>/dado 2d6</code>";
+    return await apiCall("sendMessage", payload);
   }
 
   const count = Math.min(parseInt(match[1] || "1"), 10);
@@ -1152,16 +1131,11 @@ async function handleDado(msg, argsText) {
   }
 
   const user = escapeHTML(msg.from ? (msg.from.first_name || msg.from.username || "Templário") : "Templário");
-  const text = `🎲 <b>${user} rolou os dados (${count}d${sides}):</b>\n\n` +
+  payload.text = `🎲 <b>${user} rolou os dados (${count}d${sides}):</b>\n\n` +
     `🎯 <b>Resultados:</b> [ ${rolls.join(", ")} ]\n` +
     `🔥 <b>Soma Total:</b> ${total}`;
 
-  await apiCall("sendMessage", {
-    chat_id: msg.chat.id,
-    text: text,
-    message_thread_id: msg.message_thread_id || 11,
-    parse_mode: "HTML"
-  });
+  await apiCall("sendMessage", payload);
 }
 
 // CITAÇÃO TEMPLÁRIA
@@ -1175,16 +1149,15 @@ async function handleFrase(msg) {
   ];
   const randomFrase = frases[Math.floor(Math.random() * frases.length)];
 
-  await apiCall("sendMessage", {
-    chat_id: msg.chat.id,
-    text: randomFrase,
-    message_thread_id: msg.message_thread_id
-  });
+  const payload = { chat_id: msg.chat.id, text: randomFrase };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
+  await apiCall("sendMessage", payload);
 }
 
 // AJUDA COMPLETA
 async function handleAjuda(msg) {
-  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v9.1)</b> 🍺\n\n` +
+  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v9.2)</b> 🍺\n\n` +
     `📌 <i>Consulte o tópico <b>📜 Manual & Comandos</b> para a lista completa com link do GitHub!</i>\n\n` +
     `👾 <b>/discord</b> - Entrar no servidor do Discord da Taverna\n` +
     `🎮 <b>/jogando</b> ou <b>/steamstatus</b> - Ver quem está jogando na Steam agora\n` +
@@ -1201,12 +1174,14 @@ async function handleAjuda(msg) {
     `🎁 <b>/steam</b> - Jogos 100% gratuitos para PC de hoje!\n` +
     `💡 <b>/ajuda</b> - Mostra esta mensagem.`;
 
-  await apiCall("sendMessage", {
+  const payload = {
     chat_id: msg.chat.id,
     text: text,
-    message_thread_id: msg.message_thread_id,
     parse_mode: "HTML"
-  });
+  };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
+  await apiCall("sendMessage", payload);
 }
 
 let offset = 0;
@@ -1314,6 +1289,6 @@ async function pollUpdates() {
   }
 }
 
-console.log("🛡️ Bot da Taberna dos Templários v9.1 (Com Link do Discord Oficial do Usuário) iniciado!");
+console.log("🛡️ Bot da Taberna dos Templários v9.2 (Com Correção Universal do Comando /jogar) iniciado!");
 console.log("Aguardando novas mensagens e comandos no Telegram...");
 pollUpdates();
