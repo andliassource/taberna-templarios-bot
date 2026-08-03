@@ -209,7 +209,7 @@ async function sendDiscordNotification(gameName, organizer) {
       title: "🎮 NOVA JOGATINA CONVOCADA NO TELEGRAM! 🛡️",
       description: `**Jogo:** ${gameName}\n**Organizador:** ${organizer}\n\nEntre no chat do Telegram ou venha para o canal de voz do Discord!`,
       color: 5814783,
-      footer: { text: "Taberna dos Templários Bot v10.1" },
+      footer: { text: "Taberna dos Templários Bot v11.0" },
       timestamp: new Date().toISOString()
     };
 
@@ -224,8 +224,8 @@ async function sendDiscordNotification(gameName, organizer) {
   }
 }
 
-// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL (v10.1)
-const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v10.1 Nuvem 24/7)\n\n` +
+// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL (v11.0)
+const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v11.0 Áudio Completo)\n\n` +
   `📌 <b>Esta mensagem fica sempre fixada e atualizada com as novas funções!</b>\n\n` +
   `🌐 <b>Repositório Oficial no GitHub:</b>\n` +
   `🔗 <a href="https://github.com/andliassource/taberna-templarios-bot">https://github.com/andliassource/taberna-templarios-bot</a>\n\n` +
@@ -245,8 +245,8 @@ const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b
   `🍿 <b>CINEMA & SORTEIO DE FILMES</b>\n` +
   `• <code>/sortearfilme [gênero]</code> - Sortear filmes aclamados para assistir hoje (Ex: <code>/sortearfilme terror</code>)\n` +
   `• <code>/filme [Nome]</code> - Sinopse, capa HD e onde assistir grátis (Pluto TV/YouTube)\n\n` +
-  `🎵 <b>MÚSICA & DEEZER (PLAYER NATIVO HD)</b>\n` +
-  `• <code>/música [Nome]</code> ou <code>/deezer</code> - Player flutuante HD com capa e botões Deezer/Spotify/YouTube\n\n` +
+  `🎵 <b>MÚSICA & PLAYER NATIVO (FAIXA COMPLETA 🔊)</b>\n` +
+  `• <code>/música [Nome]</code> ou <code>/deezer</code> - Player de áudio da música inteira completa com capa e botões Deezer/Spotify/YouTube\n\n` +
   `📚 <b>BIBLIOTECA TEMPLÁRIA</b>\n` +
   `• <code>/livro [Nome]</code> - Livros em PDF e EPUB grátis\n\n` +
   `🎲 <b>RPG, DADOS & ENQUETES</b>\n` +
@@ -272,7 +272,7 @@ async function syncPinnedManual() {
         parse_mode: "HTML",
         disable_web_page_preview: true
       });
-      console.log("📌 Mensagem fixada do manual sincronizada na v10.1!");
+      console.log("📌 Mensagem fixada do manual sincronizada na v11.0!");
     } catch (e) {
       console.error("Erro ao sincronizar mensagem fixada do manual:", e.message);
     }
@@ -285,10 +285,11 @@ async function handleStatus(msg) {
   const uptimeHours = (uptimeMs / (1000 * 60 * 60)).toFixed(2);
   const memMb = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
 
-  const statusText = `📊 <b>SAÚDE & DIAGNÓSTICO DO BOT DA TAVERNA (v10.1)</b> 🛡️\n\n` +
+  const statusText = `📊 <b>SAÚDE & DIAGNÓSTICO DO BOT DA TAVERNA (v11.0)</b> 🛡️\n\n` +
     `🟢 <b>Estado:</b> 100% Online & Ativo (Nuvem Render 24/7)\n` +
     `⏱️ <b>Uptime:</b> ${uptimeHours} horas de execução contínua\n` +
     `💾 <b>Memória RAM Usada:</b> ${memMb} MB\n` +
+    `🎵 <b>Player de Áudio:</b> Suporte a Faixa Completa em Alta Fidelidade\n` +
     `👥 <b>Membros no XP:</b> ${Object.keys(dbData.userXP).length} Templários registrados\n` +
     `🎮 <b>Contas Steam Vinculadas:</b> ${Object.keys(dbData.userSteamIDs).length}\n\n` +
     `⚡ <i>"Firme, forte e inabalável como a honra dos Templários!"</i>`;
@@ -303,7 +304,7 @@ async function handleStatus(msg) {
   await apiCall("sendMessage", payload);
 }
 
-// CONVOCAÇÃO PARA JOGATINA (v10.1)
+// CONVOCAÇÃO PARA JOGATINA (v11.0)
 async function handleJogar(msg, argsText) {
   try {
     const rawGameName = argsText.trim() || "Jogatina Geral";
@@ -846,7 +847,7 @@ async function handleNewMembers(msg) {
       `🤖 <b>Taverneiro IA:</b> Use <code>/ia [Sua pergunta]</code> ou apenas cite "taverneiro"!\n` +
       `🎤 <b>Áudios Lendários:</b> Use <code>/áudio</code> para memes de áudio virais!\n` +
       `🎬 <b>Cine Templário:</b> Use <code>/filme [Nome]</code> ou <code>/sortearfilme terror</code>\n` +
-      `🎵 <b>Música Templária:</b> Use <code>/música [Nome]</code> ou <code>/deezer</code>!\n` +
+      `🎵 <b>Música Templária:</b> Use <code>/música [Nome]</code> para a faixa completa!\n` +
       `⚽ <b>Futebol:</b> Use <code>/futebol</code> para ver os jogos de hoje!\n` +
       `📚 <b>Biblioteca Templária:</b> Use <code>/livro [Nome]</code> para PDF/ePUB grátis!\n` +
       `🌤️ <b>Clima & Status:</b> Use <code>/tempo [Cidade]</code> ou <code>/status</code>!\n` +
@@ -926,7 +927,7 @@ async function handleFilme(msg, query) {
   }
 }
 
-// BUSCA DE MÚSICAS COM PLAYER NATIVO DO TELEGRAM OTIMIZADO
+// BUSCA DE MÚSICAS COM PLAYER NATIVO EM ÁUDIO COMPLETO (v11.0)
 async function handleMusica(msg, query) {
   const searchTerm = query.trim();
   const payload = { chat_id: msg.chat.id, parse_mode: "HTML" };
@@ -938,6 +939,48 @@ async function handleMusica(msg, query) {
   }
 
   try {
+    // 1. Tenta buscar a faixa inteira completa em alta qualidade (Audio Stream Completo)
+    const saavnRes = await fetch(`https://jiosaavn-api-v3.vercel.app/search?query=${encodeURIComponent(searchTerm)}`);
+    const saavnData = await saavnRes.json();
+
+    if (saavnData && saavnData.results && saavnData.results.length > 0) {
+      const topSong = saavnData.results[0];
+      const detailRes = await fetch(`https://jiosaavn-api-v3.vercel.app/song?id=${topSong.id}`);
+      const detailData = await detailRes.json();
+
+      if (detailData && detailData.media_url) {
+        const songTitle = detailData.song || detailData.title || topSong.title;
+        const artist = detailData.primary_artists || detailData.singers || topSong.description || "Artista";
+        const album = detailData.album || topSong.album || "Single";
+        const cover = detailData.image || topSong.image;
+        const fullAudioUrl = detailData.media_url;
+
+        const queryEscaped = encodeURIComponent(`${artist} - ${songTitle}`);
+        const deezerLink = `https://www.deezer.com/search/${queryEscaped}`;
+        const youtubeMusicLink = `https://music.youtube.com/search?q=${queryEscaped}`;
+        const spotifyUrl = `https://open.spotify.com/search/${queryEscaped}`;
+
+        payload.audio = fullAudioUrl;
+        payload.title = songTitle;
+        payload.performer = artist;
+        payload.thumbnail = cover;
+        payload.caption = `🎵 <b>${escapeHTML(songTitle)}</b> (Música Completa 🔊)\n👤 <b>Artista:</b> ${escapeHTML(artist)}\n💿 <b>Álbum:</b> ${escapeHTML(album)}`;
+        payload.reply_markup = {
+          inline_keyboard: [
+            [
+              { text: "💜 Deezer", url: deezerLink },
+              { text: "▶️ YouTube Music", url: youtubeMusicLink },
+              { text: "🟢 Spotify", url: spotifyUrl }
+            ]
+          ]
+        };
+
+        const resAudio = await apiCall("sendAudio", payload);
+        if (resAudio.ok) return;
+      }
+    }
+
+    // 2. Fallback Deezer oficial se a busca secundária falhar
     const deezerRes = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(searchTerm)}&limit=1`);
     const deezerData = await deezerRes.json();
 
@@ -963,32 +1006,13 @@ async function handleMusica(msg, query) {
         payload.reply_markup = {
           inline_keyboard: [
             [
-              { text: "💜 Ouvir no Deezer", url: deezerLink },
+              { text: "💜 Deezer", url: deezerLink },
               { text: "▶️ YouTube Music", url: youtubeMusicLink },
               { text: "🟢 Spotify", url: spotifyUrl }
             ]
           ]
         };
         await apiCall("sendAudio", payload);
-      } else {
-        const text = `🎵 <b>${escapeHTML(songTitle)}</b>\n` +
-          `👤 <b>Artista:</b> ${escapeHTML(artist)}\n` +
-          `💿 <b>Álbum:</b> ${escapeHTML(album)}\n\n` +
-          `🎧 <b>ONDE OUVIR:</b>\n` +
-          `💜 <a href="${deezerLink}">Ouvir Completo no Deezer</a>\n` +
-          `▶️ <a href="${youtubeMusicLink}">Ouvir no YouTube Music</a>\n` +
-          `🟢 <a href="${spotifyUrl}">Ouvir no Spotify</a>`;
-
-        payload.text = text;
-
-        if (cover) {
-          payload.photo = cover;
-          payload.caption = text;
-          delete payload.text;
-          await apiCall("sendPhoto", payload);
-        } else {
-          await apiCall("sendMessage", payload);
-        }
       }
       return;
     }
@@ -1209,7 +1233,7 @@ async function handleFrase(msg) {
 
 // AJUDA COMPLETA
 async function handleAjuda(msg) {
-  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v10.1 Nuvem 24/7)</b> 🍺\n\n` +
+  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v11.0 Áudio Completo)</b> 🍺\n\n` +
     `📌 <i>Consulte o tópico <b>📜 Manual & Comandos</b> para a lista completa com link do GitHub!</i>\n\n` +
     `👾 <b>/discord</b> - Entrar no servidor do Discord da Taverna\n` +
     `🎮 <b>/jogando</b> ou <b>/steamstatus</b> - Ver quem está jogando na Steam agora\n` +
@@ -1218,7 +1242,7 @@ async function handleAjuda(msg) {
     `⚽ <b>/futebol</b> - Placar e jogos de hoje\n` +
     `🍿 <b>/sortearfilme [gênero]</b> - Sortear um filme para assistir\n` +
     `🤖 <b>/ia [pergunta]</b> - Pergunta qualquer coisa ao Taverneiro!\n` +
-    `🎵 <b>/deezer [Nome]</b> - Player flutuante HD de áudio com capas!\n` +
+    `🎵 <b>/deezer [Nome]</b> - Player flutuante com FAIXA COMPLETA em áudio HD!\n` +
     `🌤️ <b>/status</b> - Saúde do bot, uptime e latência\n` +
     `🌤️ <b>/tempo [Cidade]</b> - Previsão do tempo Open Source!\n` +
     `🗳️ <b>/enquete Tema | Opc1 | Opc2</b> - Cria enquetes no chat!\n` +
@@ -1344,6 +1368,6 @@ async function pollUpdates() {
   }
 }
 
-console.log("🛡️ Bot da Taberna dos Templários v10.1 (Máxima Estabilidade, Health Check HTTP & Status) iniciado!");
+console.log("🛡️ Bot da Taberna dos Templários v11.0 (Com Suporte a Música Inteira Completa em Áudio HD) iniciado!");
 console.log("Aguardando novas mensagens e comandos no Telegram...");
 pollUpdates();
