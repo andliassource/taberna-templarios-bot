@@ -158,6 +158,34 @@ function parseTextToSession(text, defaultGame = "Jogatina Geral", defaultOrganiz
   return session;
 }
 
+// COLETÂNEA DE PIADAS DE TIOZÃO & TAVERNA DOS TEMPLÁRIOS
+const PIADAS_TAVERNA_E_TIOZAO = [
+  // PIADAS DE TAVERNA & MEDIEVAIS
+  { setup: " Um bruxo e um templário entram na taverna. O garçom pergunta: 'O que vão tomar?'", punch: "O bruxo responde: 'Porção mágica!'. E o templário diz: 'Por mim pode ser porção dupla de hidromel!' 🍺" },
+  { setup: " Por que o cavaleiro medieval comprou uma impressora?", punch: "Para imprimir as 'cartas de alforria' em alta resolução! 🛡️" },
+  { setup: " O que o dragão disse quando viu os Templários armados de armadura?", punch: "'Oba! Comida em marmita de alumínio!' 🐉🔥" },
+  { setup: " O que o taverneiro disse pro bardo que errou todas as notas do alaúde?", punch: "'Aqui na Taverna nós aceitamos de tudo, menos afinador quebrado!' 🎶🍺" },
+  { setup: " Por que o Rei Arthur nunca perdia no jogo da velha?", punch: "Porque ele sempre jogava com a Távola Redonda! 👑" },
+  { setup: " Um anão entra na taverna e pede uma cerveja bem grande. O taverneiro coloca o caneco no balcão e diz:", punch: "'Essa aqui é por conta da casa! Mas se você beber tudo sozinho, vai sair daqui um anão de grande porte!' 🍺" },
+  { setup: " Qual é o cúmulo da paciência para um Cavaleiro Templário?", punch: "Esperar a armadura enferrujar para dizer que tá 'na moda vintage'! ⚔️" },
+
+  // PIADAS CLÁSSICAS DE TIOZÃO
+  { setup: " Por que o jacaré foi ao banco?", punch: "Para ver a conta-corrente! 🐊💳" },
+  { setup: " Por que o livro de matemática se suicidou?", punch: "Porque tinha muitos problemas! 📚😭" },
+  { setup: " Qual é a planta que não fala?", punch: "A planta MUDA! 🌿" },
+  { setup: " O que o tomate foi fazer no banco?", punch: "Tirar o extrato! 🍅🏦" },
+  { setup: " Por que o computador foi ao médico?", punch: "Porque estava com um vírus! 💻🦠" },
+  { setup: " Qual é o cúmulo da força?", punch: "Dobrar a esquina! 🪨" },
+  { setup: " Como se chama o cachorro do mágico?", punch: "Labra-cadabra! 🐕🪄" },
+  { setup: " Por que a aranha é o animal mais carente do mundo?", punch: "Porque ela é um 'spider-man'! 🕷️" },
+  { setup: " O que o milho disse para a pipoca?", punch: "Você é um estouro! 🍿" },
+  { setup: " O que o chão falou para a parede?", punch: "Te vejo no canto! 🧱" },
+  { setup: " Por que a foto foi presa?", punch: "Porque foi revelada! 📸" },
+  { setup: " Qual é o prato favorito do caubói?", punch: "Mumu com farofa! 🤠" },
+  { setup: " Por que o navio foi pro psicólogo?", punch: "Porque estava no fundo do poço! 🚢" },
+  { setup: " O que a impressora disse para a outra?", punch: "Essa folha é sua ou é impressão minha? 🖨️" }
+];
+
 const MEMES_VIRAIS_INTERNET = [
   { title: "🤠 UEPA! (Ratinho)", url: "https://cdn.myinstants.com/media/sounds/uepa.mp3" },
   { title: "😱 RAPAZ! (Ratinho)", url: "https://cdn.myinstants.com/media/sounds/rapaz_3.mp3" },
@@ -209,7 +237,7 @@ async function sendDiscordNotification(gameName, organizer) {
       title: "🎮 NOVA JOGATINA CONVOCADA NO TELEGRAM! 🛡️",
       description: `**Jogo:** ${gameName}\n**Organizador:** ${organizer}\n\nEntre no chat do Telegram ou venha para o canal de voz do Discord!`,
       color: 5814783,
-      footer: { text: "Taberna dos Templários Bot v11.1" },
+      footer: { text: "Taberna dos Templários Bot v12.0" },
       timestamp: new Date().toISOString()
     };
 
@@ -224,11 +252,14 @@ async function sendDiscordNotification(gameName, organizer) {
   }
 }
 
-// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL (v11.1)
-const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v11.1 Player Otimizado)\n\n` +
+// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL (v12.0)
+const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v12.0 Modo Humor)\n\n` +
   `📌 <b>Esta mensagem fica sempre fixada e atualizada com as novas funções!</b>\n\n` +
   `🌐 <b>Repositório Oficial no GitHub:</b>\n` +
   `🔗 <a href="https://github.com/andliassource/taberna-templarios-bot">https://github.com/andliassource/taberna-templarios-bot</a>\n\n` +
+  `🤡 <b>HUMOR, PIADAS & TAVERNA</b>\n` +
+  `• <code>/piada</code> ou <code>/humor</code> - Piadas de Tiozão e histórias engraçadas de Taverna\n` +
+  `• <code>/áudio</code> ou <code>/efeito</code> - Memes de som reais da internet (UEPA, RAPAZ, CAVALO, RECEBA, etc.)\n\n` +
   `👾 <b>INTEGRAÇÃO DISCORD DA TAVERNA</b>\n` +
   `• <code>/discord</code> - Link direto do Servidor/Canal do Discord da Taverna\n` +
   `• <code>/jogando</code> ou <code>/steamstatus</code> - Ver quem dos Templários está online jogando na Steam agora\n` +
@@ -245,15 +276,13 @@ const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b
   `🍿 <b>CINEMA & SORTEIO DE FILMES</b>\n` +
   `• <code>/sortearfilme [gênero]</code> - Sortear filmes aclamados para assistir hoje (Ex: <code>/sortearfilme terror</code>)\n` +
   `• <code>/filme [Nome]</code> - Sinopse, capa HD e onde assistir grátis (Pluto TV/YouTube)\n\n` +
-  `🎵 <b>MÚSICA & PLAYER NATIVO (FAIXA COMPLETA + ATALHOS)</b>\n` +
-  `• <code>/música [Nome]</code> ou <code>/deezer</code> - Player de áudio com capa HD e botão direto para ouvir completa no YouTube/Deezer/Spotify\n\n` +
+  `🎵 <b>MÚSICA & PLAYER NATIVO</b>\n` +
+  `• <code>/música [Nome]</code> ou <code>/deezer</code> - Player de áudio com capa HD e botão de áudio completo no YouTube/Deezer/Spotify\n\n` +
   `📚 <b>BIBLIOTECA TEMPLÁRIA</b>\n` +
   `• <code>/livro [Nome]</code> - Livros em PDF e EPUB grátis\n\n` +
   `🎲 <b>RPG, DADOS & ENQUETES</b>\n` +
   `• <code>/dado 1d20</code> - Rola dados de RPG em tempo real\n` +
   `• <code>/enquete Tema | Opção 1 | Opção 2</code> - Cria enquetes interativas\n\n` +
-  `🎤 <b>MEMES DE ÁUDIO VIRAIS</b>\n` +
-  `• <code>/áudio</code> ou <code>/efeito</code> - Memes de som reais da internet (UEPA, RAPAZ, CAVALO, RECEBA, etc.)\n\n` +
   `🌤️ <b>CLIMA, STATUS & FINANCEIRO</b>\n` +
   `• <code>/status</code> ou <code>/ping</code> - Exibe a saúde do bot, uptime e latência da nuvem\n` +
   `• <code>/tempo [Cidade]</code> - Temperatura e clima em tempo real (Open-Meteo)\n` +
@@ -272,11 +301,33 @@ async function syncPinnedManual() {
         parse_mode: "HTML",
         disable_web_page_preview: true
       });
-      console.log("📌 Mensagem fixada do manual sincronizada na v11.1!");
+      console.log("📌 Mensagem fixada do manual sincronizada na v12.0 com o comando /piada!");
     } catch (e) {
       console.error("Erro ao sincronizar mensagem fixada do manual:", e.message);
     }
   }
+}
+
+// COMANDO PIADAS DE TIOZÃO & TAVERNA (/piada ou /humor)
+async function handlePiada(msg) {
+  const user = escapeHTML(msg.from ? (msg.from.first_name || msg.from.username || "Templário") : "Templário");
+  
+  const selectedJoke = PIADAS_TAVERNA_E_TIOZAO[Math.floor(Math.random() * PIADAS_TAVERNA_E_TIOZAO.length)];
+
+  const text = `🤡 <b>MOMENTO HUMOR DA TABERNA!</b> 🍺🤣\n\n` +
+    `👤 <b>Para o nobre:</b> ${user}\n\n` +
+    `❓ ${escapeHTML(selectedJoke.setup)}\n\n` +
+    `👉 <b>${escapeHTML(selectedJoke.punch)}</b>\n\n` +
+    `🍷 <i>"Tome um gole de hidromel que a piada melhora!"</i>`;
+
+  const payload = {
+    chat_id: msg.chat.id,
+    text: text,
+    parse_mode: "HTML"
+  };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
+  await apiCall("sendMessage", payload);
 }
 
 // COMANDO STATUS / HEALTH CHECK (/status ou /ping)
@@ -285,11 +336,11 @@ async function handleStatus(msg) {
   const uptimeHours = (uptimeMs / (1000 * 60 * 60)).toFixed(2);
   const memMb = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
 
-  const statusText = `📊 <b>SAÚDE & DIAGNÓSTICO DO BOT DA TAVERNA (v11.1)</b> 🛡️\n\n` +
+  const statusText = `📊 <b>SAÚDE & DIAGNÓSTICO DO BOT DA TAVERNA (v12.0)</b> 🛡️\n\n` +
     `🟢 <b>Estado:</b> 100% Online & Ativo (Nuvem Render 24/7)\n` +
     `⏱️ <b>Uptime:</b> ${uptimeHours} horas de execução contínua\n` +
     `💾 <b>Memória RAM Usada:</b> ${memMb} MB\n` +
-    `🎵 <b>Player de Música:</b> Otimizado com Atalho Direto para Áudio Completo (YouTube / Deezer / Spotify)\n` +
+    `🤡 <b>Acervo de Piadas:</b> ${PIADAS_TAVERNA_E_TIOZAO.length} piadas cadastradas\n` +
     `👥 <b>Membros no XP:</b> ${Object.keys(dbData.userXP).length} Templários registrados\n` +
     `🎮 <b>Contas Steam Vinculadas:</b> ${Object.keys(dbData.userSteamIDs).length}\n\n` +
     `⚡ <i>"Firme, forte e inabalável como a honra dos Templários!"</i>`;
@@ -304,7 +355,7 @@ async function handleStatus(msg) {
   await apiCall("sendMessage", payload);
 }
 
-// CONVOCAÇÃO PARA JOGATINA (v11.1)
+// CONVOCAÇÃO PARA JOGATINA (v12.0)
 async function handleJogar(msg, argsText) {
   try {
     const rawGameName = argsText.trim() || "Jogatina Geral";
@@ -627,7 +678,7 @@ async function handleSortearFilme(msg, genreQuery) {
   } catch (err) {
     await apiCall("sendMessage", {
       chat_id: msg.chat.id,
-      text: `Erro ao buscar filme: ${err.message}`,
+      text: `Erro ao sortear filme: ${err.message}`,
       message_thread_id: msg.message_thread_id
     });
   }
@@ -645,7 +696,8 @@ async function handleAutoTaverneiro(msg) {
       `🍺 Opa, nobre ${user}! Falou em cerveja gelada ou tá precisando da ajuda do Taverneiro?`,
       `⚔️ Por São Jorge, ${user}! O barril tá cheio e a conversa tá boa! O que manda?`,
       `🛡️ Na Taverna dos Templários a regra é clara: respeito aos irmãos e copo sempre cheio!`,
-      `👾 BORA PRO DISCORD! Digite <code>/discord</code> para entrar no canal do Discord da Taverna!`
+      `👾 BORA PRO DISCORD! Digite <code>/discord</code> para entrar no canal do Discord da Taverna!`,
+      `🤡 Quer dar risada? Digite <code>/piada</code> para ouvir uma piada de tiozão ou história da Taverna!`
     ];
     const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
@@ -844,10 +896,11 @@ async function handleNewMembers(msg) {
       `💬 <b>Prosa da Taverna:</b> Bate-papo geral\n` +
       `🎮 <b>Jogatina Templária:</b> Use <code>/jogar [Jogo]</code> ou <code>/perfil</code>\n` +
       `👾 <b>Discord:</b> Use <code>/discord</code> para entrar no nosso canal do Discord!\n` +
+      `🤡 <b>Piadas de Tiozão:</b> Use <code>/piada</code> para dar boas risadas!\n` +
       `🤖 <b>Taverneiro IA:</b> Use <code>/ia [Sua pergunta]</code> ou apenas cite "taverneiro"!\n` +
       `🎤 <b>Áudios Lendários:</b> Use <code>/áudio</code> para memes de áudio virais!\n` +
       `🎬 <b>Cine Templário:</b> Use <code>/filme [Nome]</code> ou <code>/sortearfilme terror</code>\n` +
-      `🎵 <b>Música Templária:</b> Use <code>/música [Nome]</code> para player com botão de áudio completo!\n` +
+      `🎵 <b>Música Templária:</b> Use <code>/música [Nome]</code> para player com áudio completo!\n` +
       `⚽ <b>Futebol:</b> Use <code>/futebol</code> para ver os jogos de hoje!\n` +
       `📚 <b>Biblioteca Templária:</b> Use <code>/livro [Nome]</code> para PDF/ePUB grátis!\n` +
       `🌤️ <b>Clima & Status:</b> Use <code>/tempo [Cidade]</code> ou <code>/status</code>!\n` +
@@ -927,7 +980,7 @@ async function handleFilme(msg, query) {
   }
 }
 
-// BUSCA DE MÚSICAS COM ATALHO DIRETO PARA MÚSICA COMPLETA (v11.1)
+// BUSCA DE MÚSICAS COM ATALHO DIRETO PARA MÚSICA COMPLETA (v12.0)
 async function handleMusica(msg, query) {
   const searchTerm = query.trim();
   const payload = { chat_id: msg.chat.id, parse_mode: "HTML" };
@@ -1212,8 +1265,9 @@ async function handleFrase(msg) {
 
 // AJUDA COMPLETA
 async function handleAjuda(msg) {
-  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v11.1 Player Otimizado)</b> 🍺\n\n` +
+  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v12.0 Modo Humor)</b> 🍺\n\n` +
     `📌 <i>Consulte o tópico <b>📜 Manual & Comandos</b> para a lista completa com link do GitHub!</i>\n\n` +
+    `🤡 <b>/piada</b> ou <b>/humor</b> - Piadas de tiozão e histórias engraçadas de Taverna!\n` +
     `👾 <b>/discord</b> - Entrar no servidor do Discord da Taverna\n` +
     `🎮 <b>/jogando</b> ou <b>/steamstatus</b> - Ver quem está jogando na Steam agora\n` +
     `🎮 <b>/perfil</b> - Ver seu Card Gamer Templário\n` +
@@ -1221,7 +1275,7 @@ async function handleAjuda(msg) {
     `⚽ <b>/futebol</b> - Placar e jogos de hoje\n` +
     `🍿 <b>/sortearfilme [gênero]</b> - Sortear um filme para assistir\n` +
     `🤖 <b>/ia [pergunta]</b> - Pergunta qualquer coisa ao Taverneiro!\n` +
-    `🎵 <b>/deezer [Nome]</b> - Player com capa HD e botão de áudio completo!\n` +
+    `🎵 <b>/deezer [Nome]</b> - Player com capa HD e botão de áudio completo no YouTube/Deezer/Spotify!\n` +
     `🌤️ <b>/status</b> - Saúde do bot, uptime e latência\n` +
     `🌤️ <b>/tempo [Cidade]</b> - Previsão do tempo Open Source!\n` +
     `🗳️ <b>/enquete Tema | Opc1 | Opc2</b> - Cria enquetes no chat!\n` +
@@ -1292,7 +1346,9 @@ async function pollUpdates() {
             const command = rawCommand.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             const argsText = parts.slice(1).join(" ");
 
-            if (command === "/discord" || command === "/voip" || command === "/call") {
+            if (command === "/piada" || command === "/humor" || command === "/trocadilho") {
+              await handlePiada(msg);
+            } else if (command === "/discord" || command === "/voip" || command === "/call") {
               await handleDiscord(msg);
             } else if (command === "/jogando" || command === "/steamstatus" || command === "/online") {
               await handleJogando(msg);
@@ -1347,6 +1403,6 @@ async function pollUpdates() {
   }
 }
 
-console.log("🛡️ Bot da Taberna dos Templários v11.1 (Com Botões Inline de Áudio Completo no YouTube/Deezer/Spotify) iniciado!");
+console.log("🛡️ Bot da Taberna dos Templários v12.0 (Com Piadas de Tiozão & Taverna + Auto-Update do Manual) iniciado!");
 console.log("Aguardando novas mensagens e comandos no Telegram...");
 pollUpdates();
