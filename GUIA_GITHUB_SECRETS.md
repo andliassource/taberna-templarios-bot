@@ -1,38 +1,32 @@
-# 🔐 Guia de Configuração de Secrets no GitHub
+# 🔒 GUIA DE CONFIGURAÇÃO DE SECRETS DO PROJETO
 
-Este guia explica como cadastrar o **TOKEN do Bot** e o **CHAT_ID** com segurança máxima nos **Repository Secrets** do GitHub.
-
----
-
-## 🔒 Passo a Passo (Leva menos de 1 minuto):
-
-1. **Acesse o seu repositório no GitHub:**
-   👉 [https://github.com/andliassource/taberna-templarios-bot](https://github.com/andliassource/taberna-templarios-bot)
-
-2. **Entre nas Configurações:**
-   * Clique na aba **`Settings`** (canto superior direito da página do repositório).
-
-3. **Navegue até os Secrets:**
-   * No menu lateral esquerdo, clique em **`Secrets and variables`** ➡️ **`Actions`**.
-
-4. **Adicione as Credenciais:**
-   * Clique no botão verde **`New repository secret`**:
-     * **Nome:** `BOT_TOKEN`
-     * **Valor:** *(Cole o token do seu bot fornecido pelo BotFather)*
-   * Clique em **`Add secret`**.
-
-   * Clique novamente em **`New repository secret`**:
-     * **Nome:** `CHAT_ID`
-     * **Valor:** `-1004492877879`
-   * Clique em **`Add secret`**.
+Para garantir a **máxima segurança** e manter o Bot da Taberna dos Templários rodando 24h na nuvem (Render) sem expor senhas no código público, utilize as variáveis de ambiente abaixo:
 
 ---
 
-## ✅ Como o Bot consome essas chaves de forma segura:
+### 🔑 1. Credenciais Principais
 
-No código `bot.js`, as credenciais são lidas automaticamente do ambiente seguro:
-```javascript
-let TOKEN = process.env.BOT_TOKEN;
-let CHAT_ID = process.env.CHAT_ID;
-```
-Isso garante que o seu token **nunca fique visível publicamente no código**, mantendo o projeto 100% livre de alertas do GitHub!
+| Variável | Descrição | Exemplo de Valor |
+| :--- | :--- | :--- |
+| **`BOT_TOKEN`** | Token do Bot no Telegram | `8854972901:AAFgUeVi...` |
+| **`CHAT_ID`** | ID do Supergrupo do Telegram | `-1004492877879` |
+| **`DISCORD_INVITE_LINK`** | Link Oficial do Canal do Discord | `https://discord.com/channels/...` |
+| **`RENDER_API_KEY`** | Token da API do Render para Deploys | `rnd_4D19AEf5oNG9kdpNzCdkqbudDXjK` |
+
+---
+
+### 🛡️ 2. Como Configurar no GitHub (Secrets & Variables)
+
+1. No seu repositório no GitHub: `https://github.com/andliassource/taberna-templarios-bot`
+2. Vá em **Settings** ➔ **Secrets and variables** ➔ **Actions**.
+3. Clique em **New repository secret**.
+4. Adicione as chaves acima.
+
+---
+
+### 🌐 3. Como Configurar no Render.com
+
+1. No painel do Render: `https://dashboard.render.com/web/srv-d9ogn8tbedkc73crr8ug`
+2. Vá em **Environment** ➔ **Add Environment Variable**.
+3. Adicione `BOT_TOKEN`, `CHAT_ID` e `DISCORD_INVITE_LINK`.
+4. Salve e o Render fará o deploy automático!

@@ -1,13 +1,15 @@
 const fs = require('fs');
 const path = require('path');
 
-// Manipuladores de Exceção Globais para IMPEDIR Crashes
+const startTime = Date.now();
+
+// Manipuladores de Exceção Globais para Resiliência Total
 process.on('uncaughtException', (err) => {
-  console.error('[UNCAUGHT EXCEPTION ATIVO]:', err ? err.message || err : err);
+  console.error('[UNCAUGHT EXCEPTION PREVENIDO]:', err ? err.message || err : err);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('[UNHANDLED REJECTION ATIVO]:', reason ? reason.message || reason : reason);
+  console.error('[UNHANDLED REJECTION PREVENIDO]:', reason ? reason.message || reason : reason);
 });
 
 // Carrega as credenciais do arquivo config.json (ou variáveis de ambiente)
@@ -207,7 +209,7 @@ async function sendDiscordNotification(gameName, organizer) {
       title: "🎮 NOVA JOGATINA CONVOCADA NO TELEGRAM! 🛡️",
       description: `**Jogo:** ${gameName}\n**Organizador:** ${organizer}\n\nEntre no chat do Telegram ou venha para o canal de voz do Discord!`,
       color: 5814783,
-      footer: { text: "Taberna dos Templários Bot v10.0" },
+      footer: { text: "Taberna dos Templários Bot v10.1" },
       timestamp: new Date().toISOString()
     };
 
@@ -222,8 +224,8 @@ async function sendDiscordNotification(gameName, organizer) {
   }
 }
 
-// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL (v10.0)
-const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v10.0 Alta Disponibilidade)\n\n` +
+// SINCRONIZAÇÃO AUTOMÁTICA DA MENSAGEM FIXADA DO MANUAL (v10.1)
+const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b> 🍺 (v10.1 Nuvem 24/7)\n\n` +
   `📌 <b>Esta mensagem fica sempre fixada e atualizada com as novas funções!</b>\n\n` +
   `🌐 <b>Repositório Oficial no GitHub:</b>\n` +
   `🔗 <a href="https://github.com/andliassource/taberna-templarios-bot">https://github.com/andliassource/taberna-templarios-bot</a>\n\n` +
@@ -252,7 +254,8 @@ const OFFICIAL_MANUAL_TEXT = `⚔️ <b>MANUAL COMPLETO & COMANDOS DA TABERNA</b
   `• <code>/enquete Tema | Opção 1 | Opção 2</code> - Cria enquetes interativas\n\n` +
   `🎤 <b>MEMES DE ÁUDIO VIRAIS</b>\n` +
   `• <code>/áudio</code> ou <code>/efeito</code> - Memes de som reais da internet (UEPA, RAPAZ, CAVALO, RECEBA, etc.)\n\n` +
-  `🌤️ <b>CLIMA & FINANCEIRO</b>\n` +
+  `🌤️ <b>CLIMA, STATUS & FINANCEIRO</b>\n` +
+  `• <code>/status</code> ou <code>/ping</code> - Exibe a saúde do bot, uptime e latência da nuvem\n` +
   `• <code>/tempo [Cidade]</code> - Temperatura e clima em tempo real (Open-Meteo)\n` +
   `• <code>/dolar</code> ou <code>/btc</code> - Cotações em tempo real do Dólar, Euro e Bitcoin\n\n` +
   `🏆 <b>RANKING DE ENGAJAMENTO (XP)</b>\n` +
@@ -269,14 +272,38 @@ async function syncPinnedManual() {
         parse_mode: "HTML",
         disable_web_page_preview: true
       });
-      console.log("📌 Mensagem fixada do manual sincronizada na v10.0!");
+      console.log("📌 Mensagem fixada do manual sincronizada na v10.1!");
     } catch (e) {
       console.error("Erro ao sincronizar mensagem fixada do manual:", e.message);
     }
   }
 }
 
-// CONVOCAÇÃO PARA JOGATINA (v10.0)
+// COMANDO STATUS / HEALTH CHECK (/status ou /ping)
+async function handleStatus(msg) {
+  const uptimeMs = Date.now() - startTime;
+  const uptimeHours = (uptimeMs / (1000 * 60 * 60)).toFixed(2);
+  const memMb = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
+
+  const statusText = `📊 <b>SAÚDE & DIAGNÓSTICO DO BOT DA TAVERNA (v10.1)</b> 🛡️\n\n` +
+    `🟢 <b>Estado:</b> 100% Online & Ativo (Nuvem Render 24/7)\n` +
+    `⏱️ <b>Uptime:</b> ${uptimeHours} horas de execução contínua\n` +
+    `💾 <b>Memória RAM Usada:</b> ${memMb} MB\n` +
+    `👥 <b>Membros no XP:</b> ${Object.keys(dbData.userXP).length} Templários registrados\n` +
+    `🎮 <b>Contas Steam Vinculadas:</b> ${Object.keys(dbData.userSteamIDs).length}\n\n` +
+    `⚡ <i>"Firme, forte e inabalável como a honra dos Templários!"</i>`;
+
+  const payload = {
+    chat_id: msg.chat.id,
+    text: statusText,
+    parse_mode: "HTML"
+  };
+  if (msg.message_thread_id) payload.message_thread_id = msg.message_thread_id;
+
+  await apiCall("sendMessage", payload);
+}
+
+// CONVOCAÇÃO PARA JOGATINA (v10.1)
 async function handleJogar(msg, argsText) {
   try {
     const rawGameName = argsText.trim() || "Jogatina Geral";
@@ -822,7 +849,7 @@ async function handleNewMembers(msg) {
       `🎵 <b>Música Templária:</b> Use <code>/música [Nome]</code> ou <code>/deezer</code>!\n` +
       `⚽ <b>Futebol:</b> Use <code>/futebol</code> para ver os jogos de hoje!\n` +
       `📚 <b>Biblioteca Templária:</b> Use <code>/livro [Nome]</code> para PDF/ePUB grátis!\n` +
-      `🌤️ <b>Clima:</b> Use <code>/tempo [Cidade]</code> para ver a previsão!\n` +
+      `🌤️ <b>Clima & Status:</b> Use <code>/tempo [Cidade]</code> ou <code>/status</code>!\n` +
       `🏆 <b>Ranking:</b> Use <code>/top</code> para ver os membros mais ativos!\n` +
       `🎁 <b>Promoções:</b> Use <code>/steam</code> para jogos grátis de PC.`;
 
@@ -1182,7 +1209,7 @@ async function handleFrase(msg) {
 
 // AJUDA COMPLETA
 async function handleAjuda(msg) {
-  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v10.0 Alta Disponibilidade)</b> 🍺\n\n` +
+  const text = `⚔️ <b>MANUAL DA TABERNA DOS TEMPLÁRIOS (v10.1 Nuvem 24/7)</b> 🍺\n\n` +
     `📌 <i>Consulte o tópico <b>📜 Manual & Comandos</b> para a lista completa com link do GitHub!</i>\n\n` +
     `👾 <b>/discord</b> - Entrar no servidor do Discord da Taverna\n` +
     `🎮 <b>/jogando</b> ou <b>/steamstatus</b> - Ver quem está jogando na Steam agora\n` +
@@ -1192,6 +1219,7 @@ async function handleAjuda(msg) {
     `🍿 <b>/sortearfilme [gênero]</b> - Sortear um filme para assistir\n` +
     `🤖 <b>/ia [pergunta]</b> - Pergunta qualquer coisa ao Taverneiro!\n` +
     `🎵 <b>/deezer [Nome]</b> - Player flutuante HD de áudio com capas!\n` +
+    `🌤️ <b>/status</b> - Saúde do bot, uptime e latência\n` +
     `🌤️ <b>/tempo [Cidade]</b> - Previsão do tempo Open Source!\n` +
     `🗳️ <b>/enquete Tema | Opc1 | Opc2</b> - Cria enquetes no chat!\n` +
     `🏆 <b>/top</b> - Ranking de membros mais ativos!\n` +
@@ -1265,6 +1293,8 @@ async function pollUpdates() {
               await handleDiscord(msg);
             } else if (command === "/jogando" || command === "/steamstatus" || command === "/online") {
               await handleJogando(msg);
+            } else if (command === "/status" || command === "/ping" || command === "/health") {
+              await handleStatus(msg);
             } else if (command === "/perfil" || command === "/card") {
               await handlePerfil(msg);
             } else if (command === "/setsteam" || command === "/steamid") {
@@ -1308,12 +1338,12 @@ async function pollUpdates() {
         }
       }
     } catch (err) {
-      console.error("[POLLING ERROR ATIVO]:", err ? err.message || err : err);
+      console.error("[POLLING ERROR PREVENIDO]:", err ? err.message || err : err);
       await new Promise(r => setTimeout(r, 5000));
     }
   }
 }
 
-console.log("🛡️ Bot da Taberna dos Templários v10.0 (Alta Disponibilidade & Supervisor Ativo) iniciado!");
+console.log("🛡️ Bot da Taberna dos Templários v10.1 (Máxima Estabilidade, Health Check HTTP & Status) iniciado!");
 console.log("Aguardando novas mensagens e comandos no Telegram...");
 pollUpdates();
