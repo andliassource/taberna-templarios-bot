@@ -1,0 +1,19 @@
+{
+  "name": "taberna-templarios-bot",
+  "version": "10.0.0",
+  "description": "Bot oficial da Taberna dos Templários para Telegram",
+  "main": "start_bot.js",
+  "scripts": {
+    "start": "node start_bot.js",
+    "build": "echo 'Build concluído com sucesso!'"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "taberna",
+    "templarios"
+  ],
+  "author": "Templários",
+  "license": "MIT",
+  "dependencies": {}
+}

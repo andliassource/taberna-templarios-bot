@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: taberna-bot
+    env: node
+    buildCommand: npm run build
+    startCommand: npm start
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: CHAT_ID
+        value: "-1004492877879"
+      - key: DISCORD_INVITE_LINK
+        value: "https://discord.com/channels/690937279882985472/690937280441090122"
